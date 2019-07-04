@@ -62,6 +62,11 @@ class DigitBuilder: public Tool {
   ///
   void ReadLAPPDIDFile();
 
+  /// \brief Read long LAPPD Mask File
+  ///
+  /// Reads in LAPPD masking file and selects different LAPPD positions
+  void ReadLLAPPDMaskFile();
+
   ///
   /// Fills the parameter name and appropriate parameter values into
   /// the parameter container, to be used in the fit
@@ -76,6 +81,11 @@ class DigitBuilder: public Tool {
   bool fParametricModel;     ///< configures if PMTs hits for each event are accumulated into one hit per PMT
   bool fIsMC;     ///< Configure whether to load from MCHits or Hits in boost store 
   std::string  fLAPPDIDFile="none";
+
+  // Masking option for long LAPPD RAT-PAC files
+  bool mask; ///< Turns masking off and on
+  std::string fLLAPPDMaskFile="none";
+//  std::vector<int> fLLAPPDIDs; // TODO
 
   Geometry* fGeometry=nullptr;    ///< ANNIE Geometry
   TRandom3 frand;  ///< Random number generator
@@ -107,6 +117,7 @@ class DigitBuilder: public Tool {
   // first Channel (stripline) of the Detector (tile).
   std::map<unsigned long,int> detectorkey_to_lappdid;
   std::map<unsigned long,int> channelkey_to_pmtid;
+  std::map<int,std::vector<double>> lappdcentermap; // creates a map of LAPPD IDs and their center positions
 };
 
 

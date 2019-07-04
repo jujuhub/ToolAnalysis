@@ -8,6 +8,9 @@ IsMC 1
 PhotoDetectorConfiguration All
 #File must be in /pnfs/ space when loading on Fermilab cluster
 #LAPPDIDFile ./configfiles/VertexReco/PhaseIIExtGrid/LAPPDIDs.txt
+#Turn masking option on/off
+mask 1
+LLAPPDMaskFile ./configfiles/VertexReco/PhaseIIRecoTruthRP/LLAPPDMask.txt
 
 #Shift to apply to digits and loaded MC Particles
 #(Used to put into tank coordinates, if hits/particles in store are not already)
