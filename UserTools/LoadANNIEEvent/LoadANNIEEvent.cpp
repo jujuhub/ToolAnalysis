@@ -189,25 +189,6 @@ bool LoadANNIEEvent::Execute() {
           total_orphans_in_file_);
       }
     }
-/*
-    // Delete the old ANNIEEvent Store if there is one
-    if ( m_data->Stores.count("ANNIEEvent") ) {
-      auto* annie_event = m_data->Stores.at("ANNIEEvent");
-      if (annie_event) delete annie_event;
-    }
-
-    // Create a new ANNIEEvent Store
-    m_data->Stores["ANNIEEvent"] = new BoostStore(false,
-      BOOST_STORE_MULTIEVENT_FORMAT);
-
-    // Load it from the new input file
-    std::string input_filename = input_filenames_.at(current_file_);
-    std::cout <<"Reading in current file "<<current_file_<<std::endl;
-    m_data->Stores["ANNIEEvent"]->Initialise(input_filename);
-    m_data->Stores["ANNIEEvent"]->Header->Get("TotalEntries",
-      total_entries_in_file_);
->>>>>>> some additions for the RunValidation tool
-*/
   }
 
    bool user_event=false;
@@ -295,8 +276,6 @@ bool LoadANNIEEvent::Execute() {
  
   if (global_evnr) m_data->Stores["ANNIEEvent"]->Set("EventNumber",global_ev);
   global_ev++; 
-
-
 
   if ( current_entry_ >= total_entries_in_file_ ) {
     ++current_file_;

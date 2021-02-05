@@ -1,6 +1,6 @@
 verbose 0
 
-OutputFile BeamRun_R2573_AllTriggers.ntuple.root
+OutputFile BeamRun1604.ntuple.root
 TankClusterProcessing 1
 MRDClusterProcessing 1
 TriggerProcessing 1

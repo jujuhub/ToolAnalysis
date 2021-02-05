@@ -188,7 +188,7 @@ class PhaseIITreeMaker: public Tool {
   std::vector<bool> fMRDSide;
   std::vector<bool> fMRDStop;
   std::vector<bool> fMRDThrough;
-
+  
   // Trigger-level information
   std::map<std::string,bool> fDataStreams;
   int fTriggerword;
