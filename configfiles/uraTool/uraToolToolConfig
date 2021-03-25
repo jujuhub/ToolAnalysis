@@ -1,0 +1,4 @@
+# Dummy config file
+
+verbosity 5
+OutputFile "utool.txt"

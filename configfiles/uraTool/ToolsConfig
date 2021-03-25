@@ -1,0 +1,5 @@
+uraTool1 uraTool configfiles/uraTool/uraToolToolConfig
+myLoadGeometry LoadGeometry configfiles/uraTool/LoadGeometryConfig
+myLoadANNIEEvent LoadANNIEEvent configfiles/uraTool/LoadANNIEEventConfig
+myPrintANNIEEvent PrintANNIEEvent configfiles/uraTool/PrintANNIEEventConfig
+myPhaseIIADCCalibrator PhaseIIADCCalibrator configfiles/uraTool/PhaseIIADCCalibratorConfig
