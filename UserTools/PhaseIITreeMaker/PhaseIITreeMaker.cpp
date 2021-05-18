@@ -488,6 +488,26 @@ bool PhaseIITreeMaker::Execute(){
             fADCWaveformSamples.push_back(size_sample);
           }
         }
+      }else {
+        //Try to get summary information on the ADC waveform samples in case no raw info is saved
+        std::map<unsigned long, std::vector<int>> raw_acqsize_map;
+        has_raw = m_data->Stores["ANNIEEvent"]->Get("RawAcqSize",raw_acqsize_map);
+        if (!has_raw) {
+          Log("RunValidation tool: Did not find RawAcqSize in ANNIEEvent! Abort",v_error,verbosity);
+          return false;
+        }
+        int size_of_window = 2000;
+        if (has_raw){
+          for (auto& temp_pair : raw_acqsize_map) {
+            const auto& achannel_key = temp_pair.first;
+            auto& araw_acqsize = temp_pair.second;
+            for (unsigned int i=0; i< araw_acqsize.size(); i++){
+              int size_sample = araw_acqsize.at(i);
+              fADCWaveformChankeys.push_back(achannel_key);
+              fADCWaveformSamples.push_back(size_sample);
+            }
+          }
+        }
       }
 
       std::vector<Hit> cluster_hits = cluster_pair.second;
@@ -596,9 +616,6 @@ bool PhaseIITreeMaker::Execute(){
         std::cout << "No TDCData store in ANNIEEvent." << std::endl;
         //return false;
      }
-    m_data->Stores.at("ANNIEEvent")->Get("TriggerWord",fTriggerword);
-    m_data->Stores.at("RecoEvent")->Get("PMTMRDCoinc",fTankMRDCoinc);
-    m_data->Stores.at("RecoEvent")->Get("NoVeto",fNoVeto);
 
     int cluster_num = 0;
     for (int i=0; i<(int)MrdTimeClusters.size(); i++){
@@ -711,7 +728,6 @@ bool PhaseIITreeMaker::Execute(){
       cluster_num += 1;
     }
   }
-    std::cout <<"8"<<std::endl;
  
   if(TriggerProcessing) {
 
