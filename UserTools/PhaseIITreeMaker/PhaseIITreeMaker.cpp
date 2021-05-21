@@ -494,46 +494,6 @@ bool PhaseIITreeMaker::Execute(){
         has_raw = m_data->Stores["ANNIEEvent"]->Get("RawAcqSize",raw_acqsize_map);
         if (!has_raw) {
           Log("RunValidation tool: Did not find RawAcqSize in ANNIEEvent! Abort",v_error,verbosity);
-          return false;
-        }
-        int size_of_window = 2000;
-        if (has_raw){
-          for (auto& temp_pair : raw_acqsize_map) {
-            const auto& achannel_key = temp_pair.first;
-            auto& araw_acqsize = temp_pair.second;
-            for (unsigned int i=0; i< araw_acqsize.size(); i++){
-              int size_sample = araw_acqsize.at(i);
-              fADCWaveformChankeys.push_back(achannel_key);
-              fADCWaveformSamples.push_back(size_sample);
-            }
-          }
-        }
-      }
-
-      std::vector<Hit> cluster_hits = cluster_pair.second;
-      fClusterTime = cluster_pair.first;
-      if(TankHitInfo_fill){
-        Log("PhaseIITreeMaker Tool: Loading tank cluster hits into cluster tree",v_debug,verbosity);
-        this->LoadTankClusterHits(cluster_hits);
-      }
-
-      if (has_raw){
-        for (auto& temp_pair : raw_waveform_map) {
-          const auto& achannel_key = temp_pair.first;
-          auto& araw_waveforms = temp_pair.second;
-          for (unsigned int i=0; i< araw_waveforms.size(); i++){
-            auto samples = araw_waveforms.at(i).GetSamples();
-            int size_sample = samples->size();
-            fADCWaveformChankeys.push_back(achannel_key);
-            fADCWaveformSamples.push_back(size_sample);
-          }
-        }
-      }else {
-        //Try to get summary information on the ADC waveform samples in case no raw info is saved
-        std::map<unsigned long, std::vector<int>> raw_acqsize_map;
-        has_raw = m_data->Stores["ANNIEEvent"]->Get("RawAcqSize",raw_acqsize_map);
-        if (!has_raw) {
-          Log("RunValidation tool: Did not find RawAcqSize in ANNIEEvent! Abort",v_error,verbosity);
           if (isData) return false;
         }
         int size_of_window = 2000;
@@ -616,7 +576,7 @@ bool PhaseIITreeMaker::Execute(){
         std::cout << "No TDCData store in ANNIEEvent." << std::endl;
         //return false;
      }
-
+    
     int cluster_num = 0;
     for (int i=0; i<(int)MrdTimeClusters.size(); i++){
       Log("PhaseIITreeMaker Tool: Resetting variables prior to getting MRD cluster info",v_debug,verbosity);
