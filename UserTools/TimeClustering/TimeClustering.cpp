@@ -520,18 +520,18 @@ bool TimeClustering::Finalise(){
 	
 	if (MakeMrdDigitTimePlot){
 		mrddigitts_file->cd();
-			mrddigitts_cosmic_cluster->Write();
-			mrddigitts_beam_cluster->Write();
-			mrddigitts_noloopback_cluster->Write();
-			mrddigitts_cluster->Write();
-			mrddigitts_cosmic->Write();
-			mrddigitts_beam->Write();
-			mrddigitts_noloopback->Write();
-			mrddigitts->Write();
+		mrddigitts_cosmic_cluster->Write();
+		mrddigitts_beam_cluster->Write();
+		mrddigitts_noloopback_cluster->Write();
+		mrddigitts_cluster->Write();
+		mrddigitts_cosmic->Write();
+		mrddigitts_beam->Write();
+		mrddigitts_noloopback->Write();
+		mrddigitts->Write();
 		mrddigitts_horizontal->Write();
 		mrddigitts_vertical->Write();
-			mrddigitts_file->Close();
-			delete mrddigitts_file;     //histograms get deleted by deleting associated TFile
+		mrddigitts_file->Close();
+		delete mrddigitts_file;     //histograms get deleted by deleting associated TFile
 		mrddigitts_file=0;
 		gROOT->cd();
 	}

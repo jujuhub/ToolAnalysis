@@ -73,7 +73,7 @@ class ClusterFinder: public Tool {
   int runnumber;
   TimeClass* EventTime=nullptr;
   std::vector<TriggerClass>* TriggerData;
-  BeamStatusClass* BeamStatus=nullptr;
+  BeamStatusClass* beamStatus=nullptr;
   std::map<unsigned long, std::vector<MCHit>>* MCHits = nullptr;
   std::map<unsigned long, std::vector<Hit>>* Hits = nullptr;
   Geometry *geom = nullptr;
@@ -120,6 +120,8 @@ class ClusterFinder: public Tool {
   std::map<double,std::vector<Hit>>* m_all_clusters;  
   std::map<double,std::vector<MCHit>>* m_all_clusters_MC;  
   std::map<double,std::vector<unsigned long>>* m_all_clusters_detkey; 
+
+  std::map<std::string, bool> fDataStreams; // added to get rid of failed tool statement
  
   // Other variables
   int max_Nhits = 0;

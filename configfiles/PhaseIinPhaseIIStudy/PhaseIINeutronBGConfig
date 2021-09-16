@@ -1,0 +1,4 @@
+verbosity 4
+OutputFilePrefix P2NBG_R2630_p25_output
+ClusterPEMin 5
+ClusterPEMax 150

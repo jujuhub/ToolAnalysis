@@ -165,8 +165,8 @@ bool ClusterFinder::Execute(){
   //----------------------------------------------------------------------------
   
   m_data->Stores["ANNIEEvent"]->Get("EventNumber", evnum);
-  m_data->Stores["ANNIEEvent"]->Get("BeamStatus", BeamStatus);
-  bool got_recoadc = m_data->Stores["ANNIEEvent"]->Get("RecoADCHits",RecoADCHits);
+  //m_data->Stores["ANNIEEvent"]->Get("BeamStatus", beamStatus);    // #TODO: causing tool to fail
+  bool got_recoadc = m_data->Stores["ANNIEEvent"]->Get("RecoADCData",RecoADCHits);
 
   if (HitStoreName == "MCHits"){
     bool got_mchits = m_data->Stores["ANNIEEvent"]->Get("MCHits", MCHits);
@@ -178,7 +178,12 @@ bool ClusterFinder::Execute(){
     bool got_hits = m_data->Stores["ANNIEEvent"]->Get("Hits", Hits);
     if (!got_hits){
       std::cout << "No Hits store in ANNIEEvent! " << std::endl;
-      return false;
+      // added DataStream lines to get rid of failed tool statement
+      std::map<std::string, bool> fDataStreams;
+      m_data->Stores.at("ANNIEEvent")->Get("DataStreams", fDataStreams);
+      if (fDataStreams["Tank"] == 1) return false;
+      else return true;
+      //return false;
     }
   } else {
     std::cout << "Selected Hits store invalid.  Must be Hits or MCHits" << std::endl;
