@@ -763,7 +763,7 @@ bool EventSelector::EventSelectionByVetoCut(){
           for (int i_hit=0; i_hit < fmv_hits.size(); i_hit++){
             MCHit fmv_hit = fmv_hits.at(i_hit);
             double time_diff = fmv_hit.GetTime()-pmt_time;
-            if (time_diff > (pmtmrd_coinc_min) && time_diff < (pmtmrd_coinc_max)){
+            if (time_diff > (pmtmrd_coinc_min-50) && time_diff < (pmtmrd_coinc_max+50)){
               has_veto = true;
            }
           }

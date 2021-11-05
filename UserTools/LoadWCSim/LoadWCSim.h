@@ -140,6 +140,8 @@ class LoadWCSim: public Tool {
 	std::map<unsigned long,std::vector<MCHit>>* MCHits;
 	std::vector<TriggerClass>* TriggerData;
 	BeamStatus beamstat;
+	std::map<std::string,std::vector<double>> MCNeutCap;
+	std::map<std::string,std::vector<std::vector<double>>> MCNeutCapGammas;
 	//BeamStatusClass* BeamStatus;
 	
 	int primarymuonindex;

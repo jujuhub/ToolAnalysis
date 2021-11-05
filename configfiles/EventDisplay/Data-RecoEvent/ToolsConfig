@@ -4,6 +4,7 @@ myLoadANNIEEvent LoadANNIEEvent configfiles/EventDisplay/Data-RecoEvent/LoadANNI
 #myPhaseIIADCHitFinder PhaseIIADCHitFinder configfiles/EventDisplay/Data-RecoEvent/PhaseIIADCHitFinderConfig
 myClusterFinder ClusterFinder configfiles/EventDisplay/Data-RecoEvent/ClusterFinderConfig
 myTimeClustering TimeClustering configfiles/EventDisplay/Data-RecoEvent/TimeClusteringConfig
+myFindMrdTracks FindMrdTracks configfiles/EventDisplay/Data-RecoEvent/FindMrdTracksConfig
 myDigitBuilder DigitBuilder configfiles/EventDisplay/Data-RecoEvent/DigitBuilderConfig
 #myHitCleaner HitCleaner configfiles/EventDisplay/Data-RecoEvent/HitCleanerConfig
 myEventSelector EventSelector configfiles/EventDisplay/Data-RecoEvent/EventSelectorConfig

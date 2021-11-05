@@ -323,6 +323,8 @@ bool LoadWCSim::Execute(){
 
 	MCHits->clear();
 	TDCData->clear();
+	MCNeutCap.clear();
+	MCNeutCapGammas.clear();
 	mrd_firstlayer=false;
 	mrd_lastlayer=false;	
 
@@ -551,15 +553,13 @@ bool LoadWCSim::Execute(){
 			//WCSimRootChernkovDigiHit has methods GetTubeId(), GetT(), GetQ(), GetPhotonIds()
 			if(verbosity>2) cout<<"next digihit at "<<digihit<<endl;
 			int tubeid = digihit->GetTubeId();  // geometry TubeID->channelkey map is made INCLUDING offset of 1
-			if (PMTMask != "None" && std::find(masked_ids.begin(),masked_ids.end(),tubeid)!=masked_ids.end()) continue; //Omit masked PMT IDs
-			if(verbosity>2) cout<<"tubeid="<<tubeid<<endl;
-			if (PMTMask != "None" && std::find(masked_ids.begin(),masked_ids.end(),tubeid)!=masked_ids.end()) continue; //Omit masked PMT IDs
 			if(pmt_tubeid_to_channelkey.count(tubeid)==0){
 				cerr<<"LoadWCSim ERROR: tank PMT with no associated ChannelKey!"<<endl;
 				return false;
 			}
 			unsigned long key = pmt_tubeid_to_channelkey.at(tubeid);
-			if(verbosity>2) cout<<"ChannelKey="<<key<<endl;
+			if(verbosity>2) cout<<"tubeid = "<<tubeid<<", ChannelKey="<<key<<endl;
+			if (PMTMask != "None" && std::find(masked_ids.begin(),masked_ids.end(),tubeid)!=masked_ids.end()) continue; //Omit masked PMT IDs
 			double digittime;
 			if(use_smeared_digit_time){
 				digittime = static_cast<double>(digihit->GetT()-HistoricTriggeroffset); // relative to trigger
@@ -694,6 +694,52 @@ bool LoadWCSim::Execute(){
 		if(verbosity>2) cout<<"setting triggerdata time to "<<EventTimeNs<<"ns"<<endl;
 		TriggerData->front().SetTime(EventTimeNs);
 		
+		//Load neutron capture information
+		int numcaptures = atrigt ? atrigt->GetNcaptures() : 0;
+                if(verbosity>1) cout<<"looping over "<<numcaptures<<" neutron captures"<<endl;
+                for(int capi=0; capi<numcaptures; capi++){
+                        if(verbosity>2) cout<<"getting capture # "<<capi<<endl;
+                        WCSimRootCapture* capt =
+                                (WCSimRootCapture*)atrigt->GetCaptures()->At(capi);
+
+			int capt_parent = capt->GetCaptureParent();
+			double capt_vtxx = capt->GetCaptureVtx(0);
+			double capt_vtxy = capt->GetCaptureVtx(1);
+			double capt_vtxz = capt->GetCaptureVtx(2);
+			int capt_ngamma = capt->GetNGamma();
+			double capt_totalE = capt->GetTotalGammaE();
+			double capt_t = capt->GetCaptureT();
+			int capt_nucleus = capt->GetCaptureNucleus();
+			std::vector<double> gamma_energies;
+			for (int i_gamma=0; i_gamma < capt_ngamma; i_gamma++){
+				WCSimRootCaptureGamma* captgamma = (WCSimRootCaptureGamma*) capt->GetGammas()->At(i_gamma);
+				gamma_energies.push_back(captgamma->GetE());
+			}
+			if (MCNeutCap.size()==0){
+				MCNeutCap.emplace("CaptParent",std::vector<double>{capt_parent});
+				MCNeutCap.emplace("CaptVtxX",std::vector<double>{capt_vtxx});
+				MCNeutCap.emplace("CaptVtxY",std::vector<double>{capt_vtxy});
+				MCNeutCap.emplace("CaptVtxZ",std::vector<double>{capt_vtxz});
+				MCNeutCap.emplace("CaptNGamma",std::vector<double>{capt_ngamma});
+				MCNeutCap.emplace("CaptTotalE",std::vector<double>{capt_totalE});
+				MCNeutCap.emplace("CaptTime",std::vector<double>{capt_t});
+				MCNeutCap.emplace("CaptNucleus",std::vector<double>{capt_nucleus});
+				MCNeutCapGammas.emplace("CaptGammas",std::vector<std::vector<double>>{gamma_energies});
+			} else {
+				MCNeutCap.at("CaptParent").push_back(capt_parent);
+				MCNeutCap.at("CaptVtxX").push_back(capt_vtxx);
+				MCNeutCap.at("CaptVtxY").push_back(capt_vtxy);
+				MCNeutCap.at("CaptVtxZ").push_back(capt_vtxz);
+				MCNeutCap.at("CaptNGamma").push_back(capt_ngamma);
+				MCNeutCap.at("CaptTotalE").push_back(capt_totalE);
+				MCNeutCap.at("CaptTime").push_back(capt_t);
+				MCNeutCap.at("CaptNucleus").push_back(capt_nucleus);
+				MCNeutCapGammas.at("CaptGammas").push_back(gamma_energies);
+			}
+		}
+
+
+
 		// update the information about tracks and which tank/mrd/veto PMTs they hit
 		// this needs updating with each MC trigger, as digits are grouped into MC trigger
 		// so these maps will then only contain the digits respective particles create
@@ -761,6 +807,8 @@ bool LoadWCSim::Execute(){
 	m_data->Stores.at("ANNIEEvent")->Set("MCFlag",true);                   // constant
 	//m_data->Stores.at("ANNIEEvent")->Set("BeamStatus",BeamStatus,true);
 	m_data->Stores.at("ANNIEEvent")->Set("BeamStatus",beamstat);
+	m_data->Stores.at("ANNIEEvent")->Set("MCNeutCap",MCNeutCap);
+	m_data->Stores.at("ANNIEEvent")->Set("MCNeutCapGammas",MCNeutCapGammas);
 	m_data->CStore.Set("NumTriggersThisMCEvt",WCSimEntry->wcsimrootevent->GetNumberOfEvents());
 	// auxilliary information about MC Truth particles
 	m_data->Stores.at("ANNIEEvent")->Set("ParticleId_to_TankTubeIds", ParticleId_to_TankTubeIds, false);
