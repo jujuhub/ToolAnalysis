@@ -40,6 +40,7 @@ bool EventSelector::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("PMTMRDOffset",fPMTMRDOffset);
   m_variables.Get("NoVeto",fNoVetoCut);
   m_variables.Get("Veto",fVetoCut);
+  m_variables.Get("ThroughGoing",fThroughGoing);
   m_variables.Get("TriggerWord",fTriggerWord);
   m_variables.Get("SaveStatusToStore", fSaveStatusToStore);
   m_variables.Get("IsMC",fIsMC);
@@ -126,7 +127,6 @@ bool EventSelector::Execute(){
       Log("EventSelector Tool: Error retrieving TDCData, true from ANNIEEvent!",v_error,verbosity);
     }
   } else {
-  
     //Get data version of MRD hits
     get_mrd = m_data->Stores.at("ANNIEEvent")->Get("TDCData",TDCData);
     if (!get_mrd) {
@@ -194,6 +194,10 @@ bool EventSelector::Execute(){
 
   bool passTriggerCut = this->EventSelectionByTrigger(fTrigger,fTriggerWord);
   m_data->Stores.at("RecoEvent")->Set("TriggerCut",passTriggerCut);
+
+  //bool passThroughGoingCut = this->EventSelectionByThroughGoing();
+  bool passThroughGoingCut = true;
+  m_data->Stores.at("RecoEvent")->Set("ThroughGoing",passThroughGoingCut);
 
   // Fill the EventSelection mask for the cuts that are supposed to be applied
   if (fMCPiKCut){
@@ -301,6 +305,11 @@ bool EventSelector::Execute(){
   if (fVetoCut){
     fEventApplied |= EventSelector::kFlagVeto;
     if (passVetoCut) fEventFlagged |= EventSelector::kFlagVeto;
+  }
+
+  if (fThroughGoing){
+    fEventApplied |= EventSelector::kFlagThroughGoing;
+    if (!passThroughGoingCut) fEventFlagged |= EventSelector::kFlagThroughGoing;
   }
 
   if (fTriggerWord > 0){
@@ -597,9 +606,11 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
   std::cout <<"pmt_cluster_size: "<<pmt_cluster_size<<", mrd cluster size: "<<MrdTimeClusters.size()<<std::endl;
 
   bool prompt_cluster = false;
-  double pmt_time = 0;
+  pmt_time = 0;
   double max_charge = 0;
-  int n_hits = 0;
+  n_hits = 0;
+
+  pmt_time = -1;
 
   if (fIsMC){
     if (m_all_clusters_MC->size()){
@@ -714,6 +725,7 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
 bool EventSelector::EventSelectionByVetoCut(){
 
  bool has_veto = false;
+ if (pmt_time > 0.){
  if (fIsMC) {
     if (get_mrd){
     if(TDCData_MC){
@@ -729,7 +741,7 @@ bool EventSelector::EventSelectionByVetoCut(){
           for (int i_hit=0; i_hit < fmv_hits.size(); i_hit++){
             MCHit fmv_hit = fmv_hits.at(i_hit);
             double time_diff = fmv_hit.GetTime()-pmt_time;
-            if (time_diff > (pmtmrd_coinc_min) && time_diff < (pmtmrd_coinc_max)){
+            if (time_diff > (pmtmrd_coinc_min-50) && time_diff < (pmtmrd_coinc_max+50)){
               has_veto = true;
            }
           }
@@ -756,7 +768,7 @@ else {
           for (int i_hit=0; i_hit < fmv_hits.size(); i_hit++){
             Hit fmv_hit = fmv_hits.at(i_hit);
             double time_diff = fmv_hit.GetTime()-pmt_time;
-            if (time_diff > (pmtmrd_coinc_min+50) && time_diff < (pmtmrd_coinc_max+50)){
+            if (time_diff > (pmtmrd_coinc_min+75) && time_diff < (pmtmrd_coinc_max+75)){	//TODO: Check this 75ns offset
               has_veto = true;
            }
           }
@@ -768,9 +780,119 @@ else {
   }
   }
   }
+  }
 
   return (!has_veto);	//Successful selection means no veto hit 
 
+}
+
+bool EventSelector::EventSelectionByThroughGoing(){
+
+	bool throughgoing = false;
+        double z0 = 0.;
+        double z1 = 0.0508;
+        double z2 = 0.0728;
+        std::vector<double> fmv_firstlayer_y{-1.987,-1.68,-1.373,-1.066,-0.758999,-0.451999,-0.144999,0.162001,0.469001,0.77601,1.083,1.39,1.697};
+
+	bool passVetoCut;
+	m_data->Stores.at("RecoEvent")->Get("NoVeto",passVetoCut);
+
+	std::vector<double> *vec_mrdclusters_time;
+	m_data->Stores["RecoEvent"]->Get("MRDClustersTime",vec_mrdclusters_time);
+
+	std::vector<unsigned long> fmv_hit_chkey;
+	std::vector<double> fmv_hit_t;
+
+
+	if (get_mrd){
+		if(TDCData){
+			if (TDCData->size()==0){
+      				Log("EventSelector tool: TDC data is empty in this event.",v_message,verbosity);
+    			} else {
+      				for (auto&& anmrdpmt : (*TDCData)){
+        				unsigned long chankey = anmrdpmt.first;
+        				Detector* thedetector = fGeometry->ChannelToDetector(chankey);
+        				unsigned long detkey = thedetector->GetDetectorID();
+        				if (thedetector->GetDetectorElement()=="Veto") {
+          					std::vector<Hit> fmv_hits = anmrdpmt.second;
+						for (int i_hit=0; i_hit < (int) fmv_hits.size(); i_hit++){
+							Hit afmvhit = fmv_hits.at(i_hit);
+							fmv_hit_chkey.push_back(chankey);
+							fmv_hit_t.push_back(afmvhit.GetTime());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (!passVetoCut && n_hits > 70){	// Need coincident veto hit for through-going candidates
+		std::vector<BoostStore>* theMrdTracks;   // the reconstructed tracks
+		int numtracksinev;
+  		m_data->Stores["MRDTracks"]->Get("MRDTracks",theMrdTracks);
+  		m_data->Stores["MRDTracks"]->Get("NumMrdTracks",numtracksinev);
+		if (numtracksinev == 1){
+			Position StartVertex;
+			Position StopVertex;
+			BoostStore* thisTrackAsBoostStore = &(theMrdTracks->at(0));
+    			thisTrackAsBoostStore->Get("StartVertex",StartVertex);
+    			thisTrackAsBoostStore->Get("StopVertex",StopVertex);
+			double mrd_start_x = StartVertex.X();
+			double mrd_start_y = StartVertex.Y();
+			double mrd_start_z = StartVertex.Z();
+			double mrd_stop_x = StopVertex.X();
+			double mrd_stop_y = StopVertex.Y();
+			double mrd_stop_z = StopVertex.Z();
+			
+			//Find intersection of extrapolated MRD track with FMV
+			double x_layer1, y_layer1, x_layer2, y_layer2;
+			std::vector<double> mrd_start{mrd_start_x,mrd_start_y,mrd_start_z};
+			std::vector<double> mrd_stop{mrd_stop_x,mrd_stop_y,mrd_stop_z};
+			FindPaddleIntersection(mrd_start,mrd_stop,x_layer1,y_layer1,z1);
+			FindPaddleIntersection(mrd_start,mrd_stop,x_layer2,y_layer2,z2);
+			unsigned long hit_chankey_layer1 = 999999;
+                        unsigned long hit_chankey_layer2 = 999999;
+                        FindPaddleChankey(x_layer1, y_layer1, 1, hit_chankey_layer1);
+                        FindPaddleChankey(x_layer2, y_layer2, 2, hit_chankey_layer2);
+
+                        bool coincident_layer1=false;
+                        bool coincident_layer2=false;
+                        if (hit_chankey_layer1 == 999999){
+                                std::cout <<"Did not find paddle with the desired intersection properties for FMV layer 1."<<std::endl;
+                        }
+                        if (hit_chankey_layer2 == 999999){
+                                std::cout << "Did not find paddle with the desired intersection properties for FMV layer 2."<<std::endl;
+                        }
+			for (int i_fmv=0; i_fmv < (int) fmv_hit_chkey.size(); i_fmv++){
+                                unsigned long chkey = fmv_hit_chkey.at(i_fmv);
+                                std::cout <<"chkey: "<<chkey<<std::endl;
+                                if (chkey <= 12){
+                                if (chkey == hit_chankey_layer1){
+					coincident_layer1=true;
+				} else if (y_layer1-fmv_firstlayer_y.at(chkey) > -0.4 &&
+                                        y_layer1-fmv_firstlayer_y.at(chkey)< 0.6 &&
+                                        fabs(x_layer1)<1.6) {
+						coincident_layer1 = true;
+					}
+				} else if (chkey > 12){
+					if (chkey == hit_chankey_layer2){
+						coincident_layer2=true;
+					} else if (y_layer2-fmv_firstlayer_y.at(chkey-13) > -0.4 &&
+                                        y_layer2-fmv_firstlayer_y.at(chkey-13)< 0.6 &&
+                                        fabs(x_layer1)<1.6) {
+						coincident_layer2=true;
+                                        }
+                                }
+			}
+
+			if (coincident_layer1 || coincident_layer2) throughgoing = true;
+
+		}
+	}
+
+	std::cout <<"EventSelector tool: Through-going: "<<throughgoing<<std::endl;
+
+	return throughgoing;
 }
 
 bool EventSelector::EventSelectionByTrigger(int current_trigger, int reference_trigger){
@@ -787,4 +909,46 @@ void EventSelector::Reset() {
   fEventApplied = EventSelector::kFlagNone;
   fEventFlagged = EventSelector::kFlagNone;
   fEventCutStatus = true; 
+}
+
+bool EventSelector::FindPaddleIntersection(std::vector<double> startpos, std::vector<double> endpos, double &x, double &y, double z){
+
+        double DirX = endpos.at(0)-startpos.at(0);
+        double DirY = endpos.at(1)-startpos.at(1);
+        double DirZ = endpos.at(2)-startpos.at(2);
+
+        if (fabs(DirZ) < 0.001) std::cout << "StartVertex = EndVertex! Track was not fitted well"<<std::endl;
+
+        double frac = (z - startpos.at(2))/DirZ;
+
+        x = startpos.at(0)+frac*DirX;
+        y = startpos.at(1)+frac*DirY;
+
+        return true;
+
 } 
+
+bool EventSelector::FindPaddleChankey(double x, double y, int layer, unsigned long &chankey){
+
+        double y_min[13]={-2.139499,-1.832499,-1.525499,-1.218499,-0.911499,-0.604499,-0.297499,0.009501,0.316501,0.623501,0.930501,1.237501,1.544501};
+        double y_max[13]={-1.834499,-1.527499,-1.220499,-0.913499,-0.606499,-0.299499,0.007501,0.314501,0.621501,0.928501,1.235501,1.542501,1.849501};
+        bool found_chankey = false;
+        for (unsigned int i_channel = 0; i_channel < 13; i_channel++){
+
+                if (found_chankey) break;
+
+                unsigned long chankey_tmp = (unsigned long) i_channel;
+                if (layer == 2) chankey_tmp += 13;
+                double xmin = -1.60;
+                double xmax = 1.60;
+                double ymin = y_min[i_channel];
+                double ymax = y_max[i_channel];
+
+                //Check if expected hit was within the channel or not
+                if (xmin <= x && xmax >= x && ymin <= y && ymax >= y){
+                  chankey = chankey_tmp;
+                  found_chankey = true;
+                }
+        }
+        return found_chankey;
+}

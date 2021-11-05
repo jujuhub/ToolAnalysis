@@ -55,6 +55,7 @@ class PhaseIITreeMaker: public Tool {
 
   //General variables
   bool isData;
+  bool hasGenie;
 
   std::map<int,std::string>* AuxChannelNumToTypeMap;
   std::map<int,double> ChannelKeyToSPEMap;
@@ -214,6 +215,28 @@ class PhaseIITreeMaker: public Tool {
   int fTruePrimaryPdg;
   double fTrueTrackLengthInWater; 
   double fTrueTrackLengthInMRD; 
+  std::vector<int> *fTruePrimaryPdgs = nullptr;
+  std::vector<double> *fTrueNeutCapVtxX = nullptr;
+  std::vector<double> *fTrueNeutCapVtxY = nullptr;
+  std::vector<double> *fTrueNeutCapVtxZ = nullptr;
+  std::vector<double> *fTrueNeutCapNucleus = nullptr;
+  std::vector<double> *fTrueNeutCapTime = nullptr;
+  std::vector<double> *fTrueNeutCapGammas = nullptr;
+  std::vector<double> *fTrueNeutCapE = nullptr;
+  std::vector<double>* fTrueNeutCapGammaE = nullptr;
+  int fTrueMultiRing;
+
+  //Genie information for event
+  double fTrueNeutrinoEnergy;
+  double fTrueQ2;
+  int fTrueCC;
+  int fTrueQEL;
+  int fTrueRES;
+  int fTrueDIS;
+  int fTrueCOH;
+  int fTrueMEC;
+  int fTrueNeutrons;
+  int fTrueProtons;
 
   // Pion and kaon counts for event
   int fPi0Count;

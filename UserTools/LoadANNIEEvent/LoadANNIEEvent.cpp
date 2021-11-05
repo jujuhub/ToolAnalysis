@@ -48,7 +48,12 @@ bool LoadANNIEEvent::Initialise(std::string config_filename, DataModel &data) {
   m_data->CStore.Set("UserEvent",false);
 
   current_entry_ += offset_evnum;
- 
+  if (offset_evnum != 0)  {
+    m_data->CStore.Set("UserEvent",true);
+    m_data->CStore.Set("LoadEvNr",offset_evnum);
+  }
+
+
   return true;
 }
 

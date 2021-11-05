@@ -12,8 +12,11 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
   m_data= &data; //assigning transient data pointer
   /////////////////////////////////////////////////////////////////
   
+  hasGenie = false;
+
   m_variables.Get("verbose", verbosity);
   m_variables.Get("IsData",isData);
+  m_variables.Get("HasGenie",hasGenie);
   m_variables.Get("TankHitInfo_fill", TankHitInfo_fill);
   m_variables.Get("MRDHitInfo_fill", MRDHitInfo_fill);
   m_variables.Get("fillCleanEventsOnly", fillCleanEventsOnly);
@@ -261,6 +264,15 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
     //MC truth information for muons
     //Output to tree when MCTruth_fill = 1 in config
     if (MCTruth_fill){
+      fTrueNeutCapVtxX = new std::vector<double>;
+      fTrueNeutCapVtxY = new std::vector<double>;
+      fTrueNeutCapVtxZ = new std::vector<double>;
+      fTrueNeutCapNucleus = new std::vector<double>;
+      fTrueNeutCapTime = new std::vector<double>;
+      fTrueNeutCapGammas = new std::vector<double>;
+      fTrueNeutCapE = new std::vector<double>;
+      fTrueNeutCapGammaE = new std::vector<double>;
+      fTruePrimaryPdgs = new std::vector<int>;
       fPhaseIITrigTree->Branch("triggerNumber",&fiMCTriggerNum,"triggerNumber/I");
       fPhaseIITrigTree->Branch("mcEntryNumber",&fMCEventNum,"mcEntryNumber/I");
       fPhaseIITrigTree->Branch("trueVtxX",&fTrueVtxX,"trueVtxX/D");
@@ -273,15 +285,35 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("trueAngle",&fTrueAngle,"trueAngle/D");
       fPhaseIITrigTree->Branch("truePhi",&fTruePhi,"truePhi/D");
       fPhaseIITrigTree->Branch("trueMuonEnergy",&fTrueMuonEnergy,"trueMuonEnergy/D");
-      fPhaseIITrigTree->Branch("truePrimaryPdg",&fTruePrimaryPdg,"truPrimaryPdg/I");
+      fPhaseIITrigTree->Branch("truePrimaryPdg",&fTruePrimaryPdg,"truePrimaryPdg/I");
       fPhaseIITrigTree->Branch("trueTrackLengthInWater",&fTrueTrackLengthInWater,"trueTrackLengthInWater/D");
       fPhaseIITrigTree->Branch("trueTrackLengthInMRD",&fTrueTrackLengthInMRD,"trueTrackLengthInMRD/D");
+      fPhaseIITrigTree->Branch("trueMultiRing",&fTrueMultiRing,"trueMultiRing/I");
       fPhaseIITrigTree->Branch("Pi0Count",&fPi0Count,"Pi0Count/I");
       fPhaseIITrigTree->Branch("PiPlusCount",&fPiPlusCount,"PiPlusCount/I");
       fPhaseIITrigTree->Branch("PiMinusCount",&fPiMinusCount,"PiMinusCount/I");
       fPhaseIITrigTree->Branch("K0Count",&fK0Count,"K0Count/I");
       fPhaseIITrigTree->Branch("KPlusCount",&fKPlusCount,"KPlusCount/I");
       fPhaseIITrigTree->Branch("KMinusCount",&fKMinusCount,"KMinusCount/I");
+      fPhaseIITrigTree->Branch("truePrimaryPdgs",&fTruePrimaryPdgs);
+      fPhaseIITrigTree->Branch("trueNeutCapVtxX",&fTrueNeutCapVtxX);
+      fPhaseIITrigTree->Branch("trueNeutCapVtxY",&fTrueNeutCapVtxY);
+      fPhaseIITrigTree->Branch("trueNeutCapVtxZ",&fTrueNeutCapVtxZ);
+      fPhaseIITrigTree->Branch("trueNeutCapNucleus",&fTrueNeutCapNucleus);
+      fPhaseIITrigTree->Branch("trueNeutCapTime",&fTrueNeutCapTime);
+      fPhaseIITrigTree->Branch("trueNeutCapGammas",&fTrueNeutCapGammas);
+      fPhaseIITrigTree->Branch("trueNeutCapE",&fTrueNeutCapE);
+      fPhaseIITrigTree->Branch("trueNeutCapGammaE",&fTrueNeutCapGammaE);
+      fPhaseIITrigTree->Branch("trueNeutrinoEnergy",&fTrueNeutrinoEnergy,"trueNeutrinoEnergy/D");
+      fPhaseIITrigTree->Branch("trueQ2",&fTrueQ2,"trueQ2/D");
+      fPhaseIITrigTree->Branch("trueCC",&fTrueCC,"trueCC/I");
+      fPhaseIITrigTree->Branch("trueQEL",&fTrueQEL,"trueQEL/I");
+      fPhaseIITrigTree->Branch("trueRES",&fTrueRES,"trueRES/I");
+      fPhaseIITrigTree->Branch("trueDIS",&fTrueDIS,"trueDIS/I");
+      fPhaseIITrigTree->Branch("trueCOH",&fTrueCOH,"trueCOH/I");
+      fPhaseIITrigTree->Branch("trueMEC",&fTrueMEC,"trueMEC/I");
+      fPhaseIITrigTree->Branch("trueNeutrons",&fTrueNeutrons,"trueNeutrons/I");
+      fPhaseIITrigTree->Branch("trueProtons",&fTrueProtons,"trueProtons/I");
     }
   
     // Reconstructed variables from each step in Muon Reco Analysis
@@ -349,12 +381,14 @@ bool PhaseIITreeMaker::Execute(){
   if(fillCleanEventsOnly){
     auto get_flagsapp = m_data->Stores.at("RecoEvent")->Get("EventFlagApplied",fEventStatusApplied);
     auto get_flags = m_data->Stores.at("RecoEvent")->Get("EventFlagged",fEventStatusFlagged); 
+    //auto get_cutstatus = m_data->Stores.at("RecoEvent")->Get("EventCutStatus",fEventCutStatus);
     if(!get_flagsapp || !get_flags) {
       Log("PhaseITreeMaker tool: No Event status applied or flagged bitmask!!", v_error, verbosity);
       return false;	
     }
     // check if event passes the cut
     if((fEventStatusFlagged) != 0) {
+    //  if (!fEventCutStatus){
       Log("PhaseIITreeMaker Tool: Event was flagged with one of the active cuts.",v_debug, verbosity);
       return true;	
     }
@@ -672,6 +706,7 @@ bool PhaseIITreeMaker::Execute(){
 
     bool pmtmrdcoinc, noveto;
     uint32_t trigword_temp;
+
     m_data->Stores.at("ANNIEEvent")->Get("TriggerWord",trigword_temp);
     fTriggerword = int(trigword_temp);
     m_data->Stores["ANNIEEvent"]->Get("TriggerExtended",fExtended);
@@ -680,6 +715,7 @@ bool PhaseIITreeMaker::Execute(){
     if (beamstat.ok()) fBeamok = 1;
     else fBeamok = 0;
     fPot = beamstat.pot();
+ 
     m_data->Stores.at("ANNIEEvent")->Get("DataStreams",fDataStreams);
     m_data->Stores.at("RecoEvent")->Get("PMTMRDCoinc",pmtmrdcoinc);
     m_data->Stores.at("RecoEvent")->Get("NoVeto",noveto);
@@ -706,6 +742,7 @@ bool PhaseIITreeMaker::Execute(){
     if(SiPMPulseInfo_fill) this->LoadSiPMHits();
  
     if(MRDHitInfo_fill) this->LoadAllMRDHits(isData);
+
 
     if(MRDReco_fill){
       fNumClusterTracks=0;
@@ -805,6 +842,26 @@ void PhaseIITreeMaker::ResetVariables() {
     fK0Count = -9999;
     fKPlusCount = -9999;
     fKMinusCount = -9999;
+    fTrueMultiRing = -9999;
+    fTruePrimaryPdgs->clear();
+    fTrueNeutCapVtxX->clear();
+    fTrueNeutCapVtxY->clear();
+    fTrueNeutCapVtxZ->clear();
+    fTrueNeutCapNucleus->clear();
+    fTrueNeutCapTime->clear();
+    fTrueNeutCapGammas->clear();
+    fTrueNeutCapE->clear();
+    fTrueNeutCapGammaE->clear();
+    fTrueNeutrinoEnergy = -9999;
+    fTrueQ2 = -9999;
+    fTrueCC = -9999;
+    fTrueQEL = -9999;
+    fTrueRES = -9999;
+    fTrueDIS = -9999;
+    fTrueCOH = -9999;
+    fTrueMEC = -9999;
+    fTrueProtons = -9999;
+    fTrueNeutrons = -9999;
   }
 
   if (RecoDebug_fill){ 
@@ -1097,9 +1154,7 @@ void PhaseIITreeMaker::LoadAllMRDHits(bool IsData){
           }
         } else {
           int wcsimid = channelkey_to_faccpmtid.at(chankey)-1;
-          std::cout <<"wcsimid: "<<wcsimid<<std::endl;
           unsigned long chankey_data = wcsimid;
-          std::cout <<"chankey_data: "<<chankey_data<<std::endl;
           for (int j = 0; j < (int) mrdhits_mc.size(); j++){
             fFMVHitT.push_back(mrdhits_mc.at(j).GetTime());
             fFMVHitDetID.push_back(detkey);
@@ -1228,8 +1283,9 @@ void PhaseIITreeMaker::LoadAllTankHits(bool IsData) {
   if (IsData) it_tank_data = (*Hits).begin();
   else it_tank_mc = (*MCHits).begin();
   bool loop_tank = true;
-  int mchits_size = MCHits->size();
-  if (mchits_size == 0) loop_tank = false;
+  int hits_size = (IsData)? Hits->size() : MCHits->size();
+  if (hits_size == 0) loop_tank = false;
+
 
   while (loop_tank){
   //for(std::pair<unsigned long, std::vector<Hit>>&& apair : *Hits){
@@ -1239,8 +1295,11 @@ void PhaseIITreeMaker::LoadAllTankHits(bool IsData) {
     Detector* this_detector = geom->ChannelToDetector(channel_key);
     Position det_position = this_detector->GetDetectorPosition();
     unsigned long detkey = this_detector->GetDetectorID();
-    int wcsimid = channelkey_to_pmtid.at(channel_key);
-    unsigned long channel_key_data = pmtid_to_channelkey[wcsimid];
+    unsigned long channel_key_data = channel_key;
+    if (!isData){
+      int wcsimid = channelkey_to_pmtid.at(channel_key);
+      channel_key_data = pmtid_to_channelkey[wcsimid];
+    }
     std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(channel_key);
     std::map<int, double>::iterator it_mc = ChannelKeyToSPEMap.find(channel_key_data);
     bool SPE_available = true;
@@ -1417,6 +1476,27 @@ bool PhaseIITreeMaker::FillMCTruthInfo() {
  
   fiMCTriggerNum = (int) fMCTriggerNum;
 
+  std::map<std::string, std::vector<double>> MCNeutCap;
+  bool get_neutcap = m_data->Stores.at("ANNIEEvent")->Get("MCNeutCap",MCNeutCap);
+  if (!get_neutcap){
+    Log("PhaseIITreeMaker: Did not find MCNeutCap in ANNIEEvent Store!",v_warning,verbosity);
+  }
+  std::map<std::string, std::vector<std::vector<double>>> MCNeutCapGammas;
+  bool get_neutcap_gammas = m_data->Stores.at("ANNIEEvent")->Get("MCNeutCapGammas",MCNeutCapGammas);
+  if (!get_neutcap_gammas){
+    Log("PhaseIITreeMaker: Did not find MCNeutCapGammas in ANNIEEvent Store!",v_warning,verbosity);
+  }
+
+  for (std::map<std::string, std::vector<std::vector<double>>>::iterator it = MCNeutCapGammas.begin(); it!= MCNeutCapGammas.end(); it++){
+  std::vector<std::vector<double>> mcneutgammas = it->second;
+  for (int i_cap=0; i_cap < (int) mcneutgammas.size(); i_cap++){
+    std::vector<double> capgammas = mcneutgammas.at(i_cap);
+    for (int i_gamma=0; i_gamma < (int) capgammas.size(); i_gamma++){
+      std::cout <<"gamma # "<<i_gamma<<", energy: "<<capgammas.at(i_gamma)<<std::endl;
+    }
+  }
+  }
+
   RecoVertex* truevtx = 0;
   auto get_muonMC = m_data->Stores.at("RecoEvent")->Get("TrueVertex",truevtx);
   auto get_muonMCEnergy = m_data->Stores.at("RecoEvent")->Get("TrueMuonEnergy",fTrueMuonEnergy);
@@ -1459,6 +1539,26 @@ bool PhaseIITreeMaker::FillMCTruthInfo() {
     successful_load = false;
   }
 
+  bool IsMultiRing = false;
+  bool get_multi = m_data->Stores.at("RecoEvent")->Get("MCMultiRingEvent",IsMultiRing);
+  if (get_multi){
+    fTrueMultiRing = (IsMultiRing)? 1 : 0;
+  } else {
+    Log("PhaseIITreeMaker Tool: True Multi Ring information missing. Continuing to build tree",v_message,verbosity);
+    successful_load = false;
+  }
+
+  std::vector<int> primary_pdgs;
+  bool has_primaries = m_data->Stores.at("RecoEvent")->Get("PrimaryPdgs",primary_pdgs);
+  if (has_primaries){
+    for (int i_part=0; i_part < (int) primary_pdgs.size(); i_part++){
+      fTruePrimaryPdgs->push_back(primary_pdgs.at(i_part));
+    }
+  } else {
+    Log("PhaseIITreeMaker Tool: Primary Pdgs information missing. Continuing to build tree",v_message,verbosity);
+    successful_load = false;
+  }
+
   int pi0count, pipcount, pimcount, K0count, Kpcount, Kmcount;
   auto get_pi0 = m_data->Stores.at("RecoEvent")->Get("MCPi0Count",pi0count);
   auto get_pim = m_data->Stores.at("RecoEvent")->Get("MCPiMinusCount",pimcount);
@@ -1478,6 +1578,73 @@ bool PhaseIITreeMaker::FillMCTruthInfo() {
     Log("PhaseIITreeMaker Tool: Missing MC Pion/Kaon count information. Continuing to build remaining tree",v_message,verbosity);
     successful_load = false;
   }
+
+  if (MCNeutCap.count("CaptVtxX")>0){
+    std::vector<double> n_vtxx = MCNeutCap["CaptVtxX"];
+    std::vector<double> n_vtxy = MCNeutCap["CaptVtxY"];
+    std::vector<double> n_vtxz = MCNeutCap["CaptVtxZ"];
+    std::vector<double> n_parent = MCNeutCap["CaptParent"];
+    std::vector<double> n_ngamma = MCNeutCap["CaptNGamma"];
+    std::vector<double> n_totale = MCNeutCap["CaptTotalE"];
+    std::vector<double> n_time = MCNeutCap["CaptTime"];
+    std::vector<double> n_nuc = MCNeutCap["CaptNucleus"];
+ 
+    for (int i_cap=0; i_cap < (int) n_vtxx.size(); i_cap++){
+      fTrueNeutCapVtxX->push_back(n_vtxx.at(i_cap));
+      fTrueNeutCapVtxY->push_back(n_vtxy.at(i_cap));
+      fTrueNeutCapVtxZ->push_back(n_vtxz.at(i_cap));
+      fTrueNeutCapNucleus->push_back(n_nuc.at(i_cap));
+      fTrueNeutCapTime->push_back(n_time.at(i_cap));
+      fTrueNeutCapGammas->push_back(n_ngamma.at(i_cap));
+      fTrueNeutCapE->push_back(n_totale.at(i_cap));
+    }
+  }
+
+  std::cout <<"MCNeutCapGammas count CaptGammas: "<<MCNeutCapGammas.count("CaptGammas")<<std::endl;
+  if (MCNeutCapGammas.count("CaptGammas")>0){
+    std::vector<std::vector<double>> cap_energies = MCNeutCapGammas["CaptGammas"];
+    std::cout <<"cap_energies size: "<<cap_energies.size()<<std::endl;
+    for (int i_cap = 0; i_cap < (int) cap_energies.size(); i_cap++){
+      for (int i_gamma=0; i_gamma < cap_energies.at(i_cap).size(); i_gamma++){
+        std::cout <<"gamma energy: "<<cap_energies.at(i_cap).at(i_gamma)<<std::endl;
+        fTrueNeutCapGammaE->push_back(cap_energies.at(i_cap).at(i_gamma));
+      }
+    }
+  }
+
+  //Load genie information
+  if (hasGenie){
+  double TrueNeutrinoEnergy, TrueQ2;
+  bool TrueCC, TrueQEL, TrueDIS, TrueCOH, TrueMEC, TrueRES;
+  int fsNeutrons, fsProtons;
+  bool get_neutrino_energy = m_data->Stores["GenieInfo"]->Get("NeutrinoEnergy",TrueNeutrinoEnergy);
+  bool get_q2 = m_data->Stores["GenieInfo"]->Get("EventQ2",TrueQ2);
+  bool get_cc = m_data->Stores["GenieInfo"]->Get("IsWeakCC",TrueCC);
+  bool get_qel = m_data->Stores["GenieInfo"]->Get("IsQuasiElastic",TrueQEL);
+  bool get_res = m_data->Stores["GenieInfo"]->Get("IsResonant",TrueRES);
+  bool get_dis = m_data->Stores["GenieInfo"]->Get("IsDeepInelastic",TrueDIS);
+  bool get_coh = m_data->Stores["GenieInfo"]->Get("IsCoherent",TrueCOH);
+  bool get_mec = m_data->Stores["GenieInfo"]->Get("IsMEC",TrueMEC);
+  bool get_n = m_data->Stores["GenieInfo"]->Get("NumFSNeutrons",fsNeutrons);
+  bool get_p = m_data->Stores["GenieInfo"]->Get("NumFSProtons",fsProtons);
+  std::cout <<"get_neutrino: "<<get_neutrino_energy<<", get_q2: "<<get_q2<<", get_cc: "<<get_cc<<", get_qel: "<<get_qel<<", get_res: "<<get_res<<", get_dis: "<<get_dis<<", get_coh: "<<get_coh<<", get_mec: "<<get_mec<<", get_n: "<<get_n<<", get_p: "<<get_p<<std::endl;
+  if (get_neutrino_energy && get_q2 && get_cc && get_qel && get_res && get_dis && get_coh && get_mec && get_n && get_p){
+    fTrueNeutrinoEnergy = TrueNeutrinoEnergy;
+    fTrueQ2 = TrueQ2;
+    fTrueCC = (TrueCC)? 1 : 0;
+    fTrueQEL = (TrueQEL)? 1 : 0;
+    fTrueRES = (TrueRES)? 1 : 0;
+    fTrueDIS = (TrueDIS)? 1 : 0;
+    fTrueCOH = (TrueCOH)? 1 : 0;
+    fTrueMEC = (TrueMEC)? 1 : 0;
+    fTrueNeutrons = fsNeutrons;
+    fTrueProtons = fsProtons;
+  } else {
+    Log("PhaseIITreeMaker tool: Did not find GENIE information. Continuing building remaining tree",v_message,verbosity);
+    successful_load = false;
+  }
+  } // end if hasGenie
+
   return successful_load;
 }
 
