@@ -150,5 +150,8 @@ if (tool=="BeamDecoder") ret=new BeamDecoder;
 if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 if (tool=="ApplyMRDEff") ret=new ApplyMRDEff;
 if (tool=="RunValidationStability") ret=new RunValidationStability;
+if (tool=="TimeDistributions") ret=new TimeDistributions;
+if (tool=="BeamRate") ret=new BeamRate;
+if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 return ret;
 }

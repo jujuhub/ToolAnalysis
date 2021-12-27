@@ -1,0 +1,4 @@
+verbose 2
+FileForListOfInputs ./configfiles/TimeDistributions/my_inputs.txt
+EventOffset 545894
+GlobalEvNr 1

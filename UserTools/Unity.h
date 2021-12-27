@@ -155,3 +155,6 @@
 #include "LoadRunInfo.h"
 #include "ApplyMRDEff.h"
 #include "RunValidationStability.h"
+#include "TimeDistributions.h"
+#include "BeamRate.h"
+#include "LoadRunInfo.h"

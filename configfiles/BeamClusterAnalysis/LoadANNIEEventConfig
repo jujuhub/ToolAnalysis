@@ -1,4 +1,4 @@
 verbose 0
 FileForListOfInputs ./configfiles/BeamClusterAnalysis/my_inputs.txt
-EventOffset 117635
+EventOffset 0
 GlobalEvNr 1

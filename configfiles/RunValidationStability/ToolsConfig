@@ -1,1 +1,2 @@
+myLoadRunInfo LoadRunInfo configfiles/RunValidationStability/LoadRunInfoConfig
 myRunValidationStability RunValidationStability configfiles/RunValidationStability/RunValidationStabilityConfig
