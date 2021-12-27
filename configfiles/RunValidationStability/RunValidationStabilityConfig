@@ -1,7 +1,11 @@
 # RunValidationStability config file
 
-verbosity 2
-InputDirectory ./RunValidationFiles
+verbosity 5
+InputDirectory /pnfs/annie/persistent/users/mnieslon/runvalidation/runvalidation_files/
 output_file RunValidationStability
-CurrentRun 2425
-NumberOfRuns 900
+CurrentRun 3090
+NumberOfRuns 50
+WeeklyMode 1
+WeekStartDate ./configfiles/RunValidationStability/my_week.txt
+OutputPath ./runvalidation_stability/
+SaveImages 1

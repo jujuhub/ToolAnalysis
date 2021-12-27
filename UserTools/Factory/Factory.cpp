@@ -124,5 +124,8 @@ if (tool=="EventClassification") ret=new EventClassification;
 
 if (tool=="DataSummary") ret=new DataSummary;
 if (tool=="RunValidationStability") ret=new RunValidationStability;
+if (tool=="TimeDistributions") ret=new TimeDistributions;
+if (tool=="BeamRate") ret=new BeamRate;
+if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 return ret;
 }

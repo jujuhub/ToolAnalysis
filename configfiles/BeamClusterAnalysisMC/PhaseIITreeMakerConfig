@@ -1,6 +1,6 @@
 verbose 5
 
-OutputFile MC_AmBe_ANNRI_Ratio1.45_Port5_z-100_24.ntuple.root
+OutputFile MCBeam_Gst_Run1008.ntuple.root
 TankClusterProcessing 1
 MRDClusterProcessing 1
 TriggerProcessing 1

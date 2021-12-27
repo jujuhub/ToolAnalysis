@@ -130,3 +130,6 @@
 #include "EventClassification.h"
 #include "DataSummary.h"
 #include "RunValidationStability.h"
+#include "TimeDistributions.h"
+#include "BeamRate.h"
+#include "LoadRunInfo.h"

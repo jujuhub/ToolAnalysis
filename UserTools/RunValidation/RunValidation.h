@@ -9,6 +9,7 @@
 #include "TFile.h"
 #include "TROOT.h"
 #include "TCanvas.h"
+#include "TTree.h"
 
 #include "Tool.h"
 
@@ -83,10 +84,23 @@ class RunValidation: public Tool {
   int GlobalRunNumber;
   int GlobalSubRunNumber;
 
+  //Trigger timestamps
+  std::vector<ULong64_t> timestamps_beam;
+  std::vector<ULong64_t> timestamps_cosmic;
+  std::vector<ULong64_t> timestamps_led;
+  std::vector<ULong64_t> timestamps_beam_extended;
+
+  //POT values
+  std::vector<double> pot_values;
+
   //ROOT-related variables
   TFile *outfile = nullptr;
   TH1D *MRD_t_clusters = nullptr;
+  TH1D *MRD_t_clusters_beam = nullptr;
   TH1D *MRD_t_clusters_cosmic = nullptr;
+  TH1D *FMV_t_clusters = nullptr;
+  TH1D *FMV_t_clusters_beam = nullptr;
+  TH1D *FMV_t_clusters_cosmic = nullptr;
   TH1D *PMT_t_clusters = nullptr;
   TH1D *PMT_t_clusters_2pe = nullptr;
   TH1D *PMT_t_clusters_5pe = nullptr;
@@ -109,15 +123,32 @@ class RunValidation: public Tool {
   TH1D *PMT_t_clusters_30pe_full = nullptr;
   TH2D *MRD_PMT_t = nullptr;
   TH2D *MRD_PMT_t_100pe = nullptr;
-  TH1D *MRD_PMT_Deltat = nullptr;
-  TH1D *MRD_PMT_Deltat_100pe = nullptr;
+  TH2D *MRD_PMT_t_Beam = nullptr;
+  TH2D *MRD_PMT_t_100pe_Beam = nullptr;
   TH2D *MRD_PMT_t_Cosmic = nullptr;
   TH2D *MRD_PMT_t_100pe_Cosmic = nullptr;
+  TH2D *FMV_PMT_t = nullptr;
+  TH2D *FMV_PMT_t_100pe = nullptr;
+  TH2D *FMV_PMT_t_Beam = nullptr;
+  TH2D *FMV_PMT_t_100pe_Beam = nullptr;
+  TH2D *FMV_PMT_t_Cosmic = nullptr;
+  TH2D *FMV_PMT_t_100pe_Cosmic = nullptr;
+  TH2D *MRD_FMV_t = nullptr;
+  TH1D *MRD_PMT_Deltat = nullptr;
+  TH1D *MRD_PMT_Deltat_100pe = nullptr;
   TH1D *MRD_PMT_Deltat_Cosmic = nullptr;
   TH1D *MRD_PMT_Deltat_100pe_Cosmic = nullptr;
+  TH1D *MRD_PMT_Deltat_Beam = nullptr;
+  TH1D *MRD_PMT_Deltat_100pe_Beam = nullptr;
   TH1D *FMV_PMT_Deltat = nullptr;
   TH1D *FMV_PMT_Deltat_100pe = nullptr;
+  TH1D *FMV_PMT_Deltat_Beam = nullptr;
+  TH1D *FMV_PMT_Deltat_Beam_100pe = nullptr;
+  TH1D *FMV_PMT_Deltat_Cosmic = nullptr;
+  TH1D *FMV_PMT_Deltat_Cosmic_100pe = nullptr;
   TH1D *MRD_FMV_Deltat = nullptr;
+  TH1D *MRD_FMV_Deltat_Beam = nullptr;
+  TH1D *MRD_FMV_Deltat_Cosmic = nullptr;
   TH1D *PMT_prompt_charge = nullptr;
   TH1D *PMT_prompt_charge_10hits = nullptr;
   TH1D *PMT_prompt_charge_zoom = nullptr;
@@ -151,7 +182,11 @@ class RunValidation: public Tool {
   TH1D *PMT_DelayedTime_Coinc_NoFMV_CB = nullptr;
   TH1D *ADCWaveform_Samples = nullptr;
   TH1D *Triggerwords = nullptr;
- 
+  TH1D *TriggerRate_Beam = nullptr;
+  TH1D *TriggerRate_Cosmic = nullptr;
+  TH1D *TriggerRate_Beam_Extended = nullptr; 
+  TH1D *TriggerRate_LED = nullptr;
+
   //Canvas
   TCanvas *canvas_beamspill = nullptr;
   TCanvas *canvas_mrd_pmt = nullptr;
@@ -161,13 +196,15 @@ class RunValidation: public Tool {
   TCanvas *canvas_channelkey = nullptr;
   TCanvas *canvas_rates = nullptr;
 
+  //Trees
+  TTree *tree_stats = nullptr;
+
   //verbosity-related variables
   int v_error = 0;
   int v_warning = 1;
   int v_message = 2;
   int v_debug = 3;
   int vv_debug = 4;
-
 
 };
 

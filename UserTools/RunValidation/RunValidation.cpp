@@ -155,7 +155,7 @@ bool RunValidation::Execute(){
     Log("RunValidation tool: Did not find MRDTriggerType in ANNIEEvent! Abort",v_error,verbosity);
     /*return false;*/	//Some events don't have MRD data -> ok
   }
-  if (MrdTriggerType == "Cosmic") std::cout <<"Cosmic MRD trigger at event "<<EventNumber<<std::endl;
+  if (MrdTriggerType == "Cosmic") Log("RunValidation tool: Cosmic MRD trigger at event "+std::to_string(EventNumber),v_message,verbosity);
 
   int triggerword;
   get_ok = m_data->Stores["ANNIEEvent"]->Get("TriggerWord",triggerword);
@@ -164,8 +164,17 @@ bool RunValidation::Execute(){
     triggerword = 5;
   }
 
+  int fExtended;
+  get_ok = m_data->Stores["ANNIEEvent"]->Get("TriggerExtended",fExtended);
+  if (!get_ok){
+    Log("RunValidation tool: Did not find TriggerExtended in ANNIEEvent! Assume TriggerExtended = 0",v_warning,verbosity);
+    fExtended = 0;
+  }
 
-  std::cout <<"triggerword: "<<triggerword<<std::endl;
+  BeamStatus beamstat;
+  m_data->Stores["ANNIEEvent"]->Get("BeamStatus",beamstat);
+  //std::cout <<"BeamStatus: "<<beamstat.Print()<<std::endl;
+  double fPot = beamstat.pot();
 
   //-------------------------------------------------------------------------
   //--------------------- Initialise histograms------------------------------
@@ -176,7 +185,8 @@ bool RunValidation::Execute(){
   Triggerwords->Fill(triggerword);
   
   // Define some booleans
-  current_time = EventTimeTank;
+  if (first_entry) current_time = EventTimeTank;
+  else if (EventTimeTank > 0) current_time = EventTimeTank;
 
   bool mrd_hit = false;
   bool facc_hit = false;
@@ -192,13 +202,12 @@ bool RunValidation::Execute(){
   //-------------------------------------------------------------------------
   //--------------------- Fill size of raw waveforms-------------------------
   //-------------------------------------------------------------------------
-/*
+
   std::map<unsigned long, std::vector<Waveform<unsigned short>>> raw_waveform_map;
   bool has_raw = m_data->Stores["ANNIEEvent"]->Get("RawADCData",raw_waveform_map);
-  if (!has_raw) {
-    Log("RunValidation tool: Did not find RawADCData in ANNIEEvent! Abort",v_error,verbosity);
-    /*return false;*/
-/*  }
+  /*if (!has_raw) {
+    Log("RunValidation tool: Did not find RawADCData in ANNIEEvent! Abort",v_message,verbosity);
+  }*/
 
   if (has_raw){
     for (auto& temp_pair : raw_waveform_map) {
@@ -210,13 +219,28 @@ bool RunValidation::Execute(){
         ADCWaveform_Samples->Fill(size_sample);
       }
     }
+  } else {
+    std::map<unsigned long, std::vector<int>> raw_acqsize_map;
+    has_raw = m_data->Stores["ANNIEEvent"]->Get("RawAcqSize",raw_acqsize_map);
+    int size_of_window = 2000;
+    if (!has_raw) {
+      Log("RunValidation tool: Did not find RawAcqSize in ANNIEEvent! Abort",v_warning,verbosity);
+    } else {
+      for (auto& temp_pair : raw_acqsize_map) {
+        const auto& achannel_key = temp_pair.first;
+        auto& araw_acqsize = temp_pair.second;
+        for (unsigned int i=0; i< araw_acqsize.size(); i++){
+          int size_sample = araw_acqsize.at(i);
+          ADCWaveform_Samples->Fill(size_sample);
+        }
+      }
+    }
   }
-*/
+
   //-------------------------------------------------------------------------
   //----------------Fill cluster time histograms-----------------------------
   //-------------------------------------------------------------------------
 
-  std::cout <<"VME"<<std::endl;
   double PMT_prompt_time=0.;
   int n_pmt_hits=0;
   double max_charge=0.;
@@ -318,7 +342,6 @@ bool RunValidation::Execute(){
     }
   }
 
-  std::cout <<"MRD"<<std::endl;
   std::vector<double> mrd_cluster_times;
   double global_mrd_time=0;
   int n_mrd_hits=0;
@@ -342,7 +365,8 @@ bool RunValidation::Execute(){
         int time = MrdDigitTimes.at(digit_value);
  	if (invert_mrd_times) time = 4000.-time;
         if (time > 1700 && time < 1750) cosmic_region = true;
-        if (triggerword == 5) MRD_t_clusters->Fill(time);
+        MRD_t_clusters->Fill(time);
+        if (triggerword == 5) MRD_t_clusters_beam->Fill(time);
         if (triggerword == 36) MRD_t_clusters_cosmic->Fill(time);
         //MRD_t_clusters->Fill(time);
         temp_mrd_time+=time;
@@ -362,7 +386,6 @@ bool RunValidation::Execute(){
   //---------------Loop over FACC entries------------------------------------
   //-------------------------------------------------------------------------
   
-  std::cout <<"FMV"<<std::endl;
   if(has_tdcdata){
     if (TDCData->size()==0){
       Log("RunValidation tool: TDC data is empty in this event.",v_message,verbosity);
@@ -375,7 +398,7 @@ bool RunValidation::Execute(){
         if (thedetector->GetDetectorElement()=="Veto") {
           //facc_hit = true;
           std::vector<Hit> fmv_hits = anmrdpmt.second;
-          for (int i_hit=0; i_hit < fmv_hits.size(); i_hit++){
+          for (int i_hit=0; i_hit < (int) fmv_hits.size(); i_hit++){
             Hit fmv_hit = fmv_hits.at(i_hit);
             double time_diff = fmv_hit.GetTime()-PMT_prompt_time;
             if (time_diff > (740) && time_diff < (840)){
@@ -383,9 +406,32 @@ bool RunValidation::Execute(){
             }
             FMV_PMT_Deltat->Fill(time_diff);
             if (max_charge_pe>100) FMV_PMT_Deltat_100pe->Fill(time_diff);
-            for (int i_mrd=0; i_mrd<mrd_cluster_times.size(); i_mrd++){
+            FMV_t_clusters->Fill(fmv_hit.GetTime());
+            if (PMT_prompt_time >0) FMV_PMT_t->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+            if (max_charge_pe > 100) FMV_PMT_t_100pe->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+            if (triggerword == 5) {
+              FMV_t_clusters_beam->Fill(fmv_hit.GetTime());
+              FMV_PMT_Deltat_Beam->Fill(time_diff);
+              if (PMT_prompt_time > 0) FMV_PMT_t_Beam->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+              if (max_charge_pe > 100){
+                FMV_PMT_Deltat_Beam_100pe->Fill(time_diff);
+                FMV_PMT_t_100pe_Beam->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+              }
+            }
+            else if (triggerword == 36) {
+              FMV_t_clusters_cosmic->Fill(fmv_hit.GetTime());
+              FMV_PMT_Deltat_Cosmic->Fill(time_diff);
+              if (PMT_prompt_time > 0) FMV_PMT_t_Cosmic->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+              if (max_charge_pe>100){
+                FMV_PMT_Deltat_Cosmic_100pe->Fill(time_diff);
+                FMV_PMT_t_100pe_Cosmic->Fill(fmv_hit.GetTime(),PMT_prompt_time);
+              }
+            }
+            for (int i_mrd=0; i_mrd < (int) mrd_cluster_times.size(); i_mrd++){
               double diff = fmv_hit.GetTime()-mrd_cluster_times.at(i_mrd);
               MRD_FMV_Deltat->Fill(diff);
+              if (triggerword == 5) MRD_FMV_Deltat_Beam->Fill(diff);
+              else if (triggerword == 36) MRD_FMV_Deltat_Cosmic->Fill(diff);
               if (fabs(diff)<100) coincident_mrd_veto = true;
             }
           }
@@ -405,20 +451,24 @@ bool RunValidation::Execute(){
   bool pmt_mrd_time_coinc=false;
   if (n_mrd_hits>0) global_mrd_time/=n_mrd_hits;
   if (n_mrd_hits>0 && n_pmt_hits>0){
-    for (int i_cluster=0; i_cluster < mrd_cluster_times.size(); i_cluster++){
+    for (int i_cluster = 0; i_cluster < (int) mrd_cluster_times.size(); i_cluster++){
     double i_mrd_time = mrd_cluster_times.at(i_cluster);
+    MRD_PMT_t->Fill(i_mrd_time,PMT_prompt_time);
+    MRD_PMT_Deltat->Fill(i_mrd_time-PMT_prompt_time);
     if (triggerword == 5){
-      MRD_PMT_t->Fill(i_mrd_time,PMT_prompt_time);
-      MRD_PMT_Deltat->Fill(i_mrd_time-PMT_prompt_time);
+      MRD_PMT_t_Beam->Fill(i_mrd_time,PMT_prompt_time);
+      MRD_PMT_Deltat_Beam->Fill(i_mrd_time-PMT_prompt_time);
     } else if (triggerword == 36){
       MRD_PMT_t_Cosmic->Fill(i_mrd_time,PMT_prompt_time);
       MRD_PMT_Deltat_Cosmic->Fill(i_mrd_time-PMT_prompt_time);
     }
     if ((i_mrd_time-PMT_prompt_time)>700 && (i_mrd_time-PMT_prompt_time)<800) pmt_mrd_time_coinc = true;
     if (max_charge_pe > 100){
+      MRD_PMT_t_100pe->Fill(i_mrd_time,PMT_prompt_time);
+      MRD_PMT_Deltat_100pe->Fill(i_mrd_time-PMT_prompt_time);
       if (triggerword == 5){
-        MRD_PMT_t_100pe->Fill(i_mrd_time,PMT_prompt_time);
-        MRD_PMT_Deltat_100pe->Fill(i_mrd_time-PMT_prompt_time);
+        MRD_PMT_t_100pe_Beam->Fill(i_mrd_time,PMT_prompt_time);
+        MRD_PMT_Deltat_100pe_Beam->Fill(i_mrd_time-PMT_prompt_time);
       } else if (triggerword == 36){
         MRD_PMT_t_100pe_Cosmic->Fill(i_mrd_time,PMT_prompt_time);
         MRD_PMT_Deltat_100pe_Cosmic->Fill(i_mrd_time-PMT_prompt_time);
@@ -432,16 +482,29 @@ bool RunValidation::Execute(){
     PMT_DelayedMult->Fill(n_delayed_clusters);
   }
 
+  //Increment event counters only for beam triggers
+
+  if (triggerword == 5) {
+    timestamps_beam.push_back(EventTimeTank);
+    if (fExtended > 0) timestamps_beam_extended.push_back(EventTimeTank);
+    if (fPot > 0) pot_values.push_back(fPot);
+  } else if (triggerword == 31) {
+    timestamps_led.push_back(EventTimeTank);
+  } else if (triggerword == 36) {
+    timestamps_cosmic.push_back(EventTimeTank);
+  }
+
+  if (triggerword == 5){
   if (tank_hit) n_pmt_clusters++;
   if (tank_hit && max_charge_pe > 100.) n_pmt_clusters_threshold++;	//100 p.e. threshold arbitrary at this point
   if (mrd_hit) n_mrd_clusters++;
-  if (coincident_tank_mrd) n_pmt_mrd_clusters++;
-  if (coincident_tank_mrd && !facc_hit) n_pmt_mrd_nofacc++;
+  if (pmt_mrd_time_coinc) n_pmt_mrd_clusters++;
+  if (pmt_mrd_time_coinc && !facc_hit) n_pmt_mrd_nofacc++;
   if (pmt_mrd_time_coinc) {
     n_pmt_mrd_time++;
     PMT_DelayedMult_Coinc->Fill(n_delayed_clusters);
     PMT_prompt_charge_MRDCoinc->Fill(max_charge_pe);
-    for (int i_del=0; i_del< delayed_clusters_times.size(); i_del++){
+    for (int i_del = 0; i_del < (int) delayed_clusters_times.size(); i_del++){
       PMT_DelayedTime_Coinc->Fill(delayed_clusters_times.at(i_del));
     }
   }
@@ -450,10 +513,10 @@ bool RunValidation::Execute(){
     PMT_DelayedMult_Coinc_NoFMV_CB->Fill(n_delayed_clusters_CB);
     PMT_prompt_charge_MRDCoinc_NoFMV->Fill(max_charge_pe);
     n_pmt_mrd_time_nofacc++;
-    for (int i_del=0; i_del< delayed_clusters_times.size(); i_del++){
+    for (int i_del = 0; i_del < (int) delayed_clusters_times.size(); i_del++){
       PMT_DelayedTime_Coinc_NoFMV->Fill(delayed_clusters_times.at(i_del));
     }
-    for (int i_del=0; i_del< delayed_clusters_times_CB.size(); i_del++){
+    for (int i_del = 0; i_del < (int) delayed_clusters_times_CB.size(); i_del++){
       PMT_DelayedTime_Coinc_NoFMV_CB->Fill(delayed_clusters_times_CB.at(i_del));
     }
   }
@@ -473,6 +536,7 @@ bool RunValidation::Execute(){
   }
   if (facc_hit && mrd_hit){
     Log("RunValidation tool: FACC hit found. coincident_tank_mrd: "+std::to_string(coincident_tank_mrd)+", n_pmt_mrd_clusters: "+std::to_string(n_pmt_mrd_clusters)+", n_facc_mrd: "+std::to_string(n_facc_mrd),v_message,verbosity);
+  }
   }
 
   return true;
@@ -584,13 +648,113 @@ bool RunValidation::Finalise(){
     ANNIE_fractions->GetXaxis()->SetBinLabel(i_label+1,category_label[i_label]);
   }
 
-  Log("RunValidation tool: Finished analysing run. Summary:",v_message,verbosity);
-  Log("RunValidation tool: Duration: "+std::to_string(int(time_diff/3600))+"h:"+std::to_string(int(time_diff/60)%60)+"min:"+std::to_string(int(time_diff)%60)+"sec",v_message,verbosity);
-  Log("RunValidation tool: Num Entries: "+std::to_string(n_entries)+", PMT Clusters: "+std::to_string(n_pmt_clusters)+", PMT Clusters > 100p.e.: "+std::to_string(n_pmt_clusters_threshold)+", MRD Clusters: "+std::to_string(n_mrd_clusters)+", PMT+MRD clusters: "+std::to_string(n_pmt_mrd_clusters)+", FACC Events: "+std::to_string(n_facc)+", FACC+PMT: "+std::to_string(n_facc_pmt)+", FACC+MRD: "+std::to_string(n_facc_mrd)+", FACC+PMT+MRD: "+std::to_string(n_facc_pmt_mrd),v_message,verbosity); 
-  Log("RunValidation tool: Total Rate: "+std::to_string(rate_entries)+", Rate PMT Clusters: "+std::to_string(rate_tank)+", Rate PMT Clusters > 100p.e.: "+std::to_string(rate_tank_threshold)+", Rate MRD Clusters: "+std::to_string(rate_mrd)+", Rate PMT+MRD clusters: "+std::to_string(rate_coincident)+", FACC Events: "+std::to_string(rate_facc)+", Rate FACC+PMT: "+std::to_string(rate_facc_pmt)+", Rate FACC+MRD: "+std::to_string(rate_facc_mrd)+", Rate FACC+PMT+MRD: "+std::to_string(rate_facc_pmt_mrd),v_message,verbosity); 
-  Log("RunValidation tool: Fraction PMT Clusters: "+std::to_string(fraction_tank)+", Fraction PMT Clusters > 100p.e.: "+std::to_string(fraction_tank_threshold)+", Fraction MRD Clusters: "+std::to_string(fraction_mrd)+", Fraction PMT+MRD clusters: "+std::to_string(fraction_coincident)+", Fraction FACC: "+std::to_string(fraction_facc)+", Fraction FACC+PMT: "+std::to_string(fraction_facc_pmt)+", Fraction FACC+MRD: "+std::to_string(fraction_facc_mrd)+", Fraction FACC+PMT+MRD: "+std::to_string(fraction_facc_pmt_mrd),v_message,verbosity); 
-  Log("RunValidation tool: Fraction Coincident PMT/MRD clusters: "+std::to_string(fraction_coincident_time)+", Fraction Coincident PMT/MRD clusters with FMV hit: "+std::to_string(fraction_facc_pmt_mrd),v_message,verbosity);
-  Log("RunValidation tool: End of Summary",v_message,verbosity);
+  std::stringstream title_trigger_beam, title_trigger_cosmic, title_trigger_led, title_trigger_beam_extended;
+  title_trigger_beam << "Trigger Rates Beam - Run "<<GlobalRunNumber;
+  title_trigger_beam_extended << "Trigger Rates Beam Extended - Run "<<GlobalRunNumber;
+  title_trigger_cosmic << "Trigger Rates Cosmic - Run "<<GlobalRunNumber;
+  title_trigger_led << "Trigger Rates LED - Run "<<GlobalRunNumber;
+
+  TriggerRate_Beam = new TH1D("TriggerRate_Beam",title_trigger_beam.str().c_str(),100,start_time/1000.,current_time/(1000.));
+  TriggerRate_Beam_Extended = new TH1D("TriggerRate_Beam_Extended",title_trigger_beam_extended.str().c_str(),100,start_time/1000.,current_time/(1000.));
+  TriggerRate_Cosmic = new TH1D("TriggerRate_Cosmic",title_trigger_cosmic.str().c_str(),100,start_time/1000.,current_time/(1000.));
+  TriggerRate_LED = new TH1D("TriggerRate_LED",title_trigger_led.str().c_str(),100,start_time/1000.,current_time/(1000.));
+
+  std::cout <<"start_time: "<<start_time<<", current_time: "<<current_time<<std::endl;
+
+  for (int i_trigger = 0; i_trigger < (int) timestamps_beam.size(); i_trigger++){
+    TriggerRate_Beam->Fill(timestamps_beam.at(i_trigger)/1000.);
+    if (i_trigger == 0) std::cout <<"Beam timestamp: "<<timestamps_beam.at(i_trigger)/1000.<<std::endl;
+    else if (i_trigger == (timestamps_beam.size()-1)) std::cout <<"Last Beam timestamp: "<<timestamps_beam.at(i_trigger)/1000.<<std::endl;
+  }
+  for (int i_trigger = 0; i_trigger < (int) timestamps_beam_extended.size(); i_trigger++){
+    TriggerRate_Beam_Extended->Fill(timestamps_beam_extended.at(i_trigger)/1000.);
+  }
+  for (int i_trigger = 0; i_trigger < (int) timestamps_cosmic.size(); i_trigger++){
+    TriggerRate_Cosmic->Fill(timestamps_cosmic.at(i_trigger)/1000.);
+  }
+  for (int i_trigger = 0; i_trigger < (int) timestamps_led.size(); i_trigger++){
+    TriggerRate_LED->Fill(timestamps_led.at(i_trigger)/1000.);
+  }
+
+  double scale_factor = 100./time_diff;
+  TriggerRate_Beam->Scale(scale_factor);
+  TriggerRate_Beam_Extended->Scale(scale_factor);
+  TriggerRate_Cosmic->Scale(scale_factor);
+  TriggerRate_LED->Scale(scale_factor);
+
+  double rate_trigger_beam = 0;
+  double rate_trigger_beam_extended = 0;
+  double rate_trigger_cosmic = 0;
+  double rate_trigger_led = 0;
+  for (int i_bin = 0; i_bin < (int) TriggerRate_Beam->GetXaxis()->GetNbins(); i_bin++){
+    rate_trigger_beam += TriggerRate_Beam->GetBinContent(i_bin+1);
+    rate_trigger_beam_extended += TriggerRate_Beam_Extended->GetBinContent(i_bin+1);
+    rate_trigger_cosmic += TriggerRate_Cosmic->GetBinContent(i_bin+1);
+    rate_trigger_led += TriggerRate_LED->GetBinContent(i_bin+1);
+  }
+  rate_trigger_beam /= 100.;
+  rate_trigger_beam_extended /= 100.;
+  rate_trigger_cosmic /= 100.;
+  rate_trigger_led /= 100.;
+
+  double pot_total=0;
+  for (int i_pot=0; i_pot < pot_values.size(); i_pot++){
+    pot_total += pot_values.at(i_pot);
+  }
+  pot_total /= time_diff;
+
+  TriggerRate_Beam->GetXaxis()->SetTimeDisplay(1);
+  TriggerRate_Beam->GetXaxis()->SetLabelSize(0.03);
+  TriggerRate_Beam->GetXaxis()->SetLabelOffset(0.03);
+  TriggerRate_Beam->GetXaxis()->SetTimeFormat("#splitline{%m/%d}{%H:%M}");
+  TriggerRate_Beam->GetYaxis()->SetTitleSize(0.045);
+  TriggerRate_Beam->GetYaxis()->SetTitle("R_{beam} [Hz]");
+  TriggerRate_Beam_Extended->GetXaxis()->SetTimeDisplay(1);
+  TriggerRate_Beam_Extended->GetXaxis()->SetLabelSize(0.03);
+  TriggerRate_Beam_Extended->GetXaxis()->SetLabelOffset(0.03);
+  TriggerRate_Beam_Extended->GetXaxis()->SetTimeFormat("#splitline{%m/%d}{%H:%M}");
+  TriggerRate_Beam->GetYaxis()->SetTitleSize(0.045);
+  TriggerRate_Beam->GetYaxis()->SetTitle("R_{beam,extended} [Hz]");
+  TriggerRate_Cosmic->GetXaxis()->SetTimeDisplay(1);
+  TriggerRate_Cosmic->GetXaxis()->SetLabelSize(0.03);
+  TriggerRate_Cosmic->GetXaxis()->SetLabelOffset(0.03);
+  TriggerRate_Cosmic->GetXaxis()->SetTimeFormat("#splitline{%m/%d}{%H:%M}");
+  TriggerRate_Cosmic->GetYaxis()->SetTitleSize(0.045);
+  TriggerRate_Cosmic->GetYaxis()->SetTitle("R_{cosmic} [Hz]");
+  TriggerRate_LED->GetXaxis()->SetTimeDisplay(1);
+  TriggerRate_LED->GetXaxis()->SetLabelSize(0.03);
+  TriggerRate_LED->GetXaxis()->SetLabelOffset(0.03);
+  TriggerRate_LED->GetXaxis()->SetTimeFormat("#splitline{%m/%d}{%H:%M}");
+  TriggerRate_LED->GetYaxis()->SetTitleSize(0.045);
+  TriggerRate_LED->GetYaxis()->SetTitle("R_{LED} [Hz]");
+
+  tree_stats = new TTree("tree_stats","Run Stats");
+  tree_stats->Branch("start_time",&start_time);
+  tree_stats->Branch("end_time",&current_time);
+  tree_stats->Branch("rate_trigger_beam",&rate_trigger_beam);
+  tree_stats->Branch("rate_trigger_beam_extended",&rate_trigger_beam_extended);
+  tree_stats->Branch("rate_trigger_cosmic",&rate_trigger_cosmic);
+  tree_stats->Branch("rate_trigger_led",&rate_trigger_led);
+  tree_stats->Branch("rate_entries",&rate_entries);
+  tree_stats->Branch("rate_tank",&rate_tank);
+  tree_stats->Branch("rate_tank_threshold",&rate_tank_threshold);
+  tree_stats->Branch("rate_mrd",&rate_mrd);
+  tree_stats->Branch("rate_coincident_time",&rate_coincident_time);
+  tree_stats->Branch("rate_coincident_time_nofacc",&rate_coincident_time_nofacc);
+  tree_stats->Branch("rate_facc",&rate_facc);
+  tree_stats->Branch("rate_facc_pmt",&rate_facc_pmt);
+  tree_stats->Branch("rate_facc_mrd",&rate_facc_mrd);
+  tree_stats->Branch("rate_facc_pmt_mrd",&rate_facc_pmt_mrd);
+  tree_stats->Branch("pot_total",&pot_total);
+  tree_stats->Fill();
+
+  Log("RunValidation tool: Finished analysing run. Summary:",v_warning,verbosity);
+  Log("RunValidation tool: Duration: "+std::to_string(int(time_diff/3600))+"h:"+std::to_string(int(time_diff/60)%60)+"min:"+std::to_string(int(time_diff)%60)+"sec",v_warning,verbosity);
+  Log("RunValidation tool: Num Entries: "+std::to_string(n_entries)+", PMT Clusters: "+std::to_string(n_pmt_clusters)+", PMT Clusters > 100p.e.: "+std::to_string(n_pmt_clusters_threshold)+", MRD Clusters: "+std::to_string(n_mrd_clusters)+", PMT+MRD clusters: "+std::to_string(n_pmt_mrd_clusters)+", FACC Events: "+std::to_string(n_facc)+", FACC+PMT: "+std::to_string(n_facc_pmt)+", FACC+MRD: "+std::to_string(n_facc_mrd)+", FACC+PMT+MRD: "+std::to_string(n_facc_pmt_mrd),v_warning,verbosity); 
+  Log("RunValidation tool: Total Rate: "+std::to_string(rate_entries)+", Rate PMT Clusters: "+std::to_string(rate_tank)+", Rate PMT Clusters > 100p.e.: "+std::to_string(rate_tank_threshold)+", Rate MRD Clusters: "+std::to_string(rate_mrd)+", Rate PMT+MRD clusters: "+std::to_string(rate_coincident)+", FACC Events: "+std::to_string(rate_facc)+", Rate FACC+PMT: "+std::to_string(rate_facc_pmt)+", Rate FACC+MRD: "+std::to_string(rate_facc_mrd)+", Rate FACC+PMT+MRD: "+std::to_string(rate_facc_pmt_mrd),v_warning,verbosity); 
+  Log("RunValidation tool: Fraction PMT Clusters: "+std::to_string(fraction_tank)+", Fraction PMT Clusters > 100p.e.: "+std::to_string(fraction_tank_threshold)+", Fraction MRD Clusters: "+std::to_string(fraction_mrd)+", Fraction PMT+MRD clusters: "+std::to_string(fraction_coincident)+", Fraction FACC: "+std::to_string(fraction_facc)+", Fraction FACC+PMT: "+std::to_string(fraction_facc_pmt)+", Fraction FACC+MRD: "+std::to_string(fraction_facc_mrd)+", Fraction FACC+PMT+MRD: "+std::to_string(fraction_facc_pmt_mrd),v_warning,verbosity); 
+  Log("RunValidation tool: Fraction Coincident PMT/MRD clusters: "+std::to_string(fraction_coincident_time)+", Fraction Coincident PMT/MRD clusters with FMV hit: "+std::to_string(fraction_facc_pmt_mrd),v_warning,verbosity);
+  Log("RunValidation tool: End of Summary",v_warning,verbosity);
 
 
   //-------------------------------------------------------------------------
@@ -598,8 +762,13 @@ bool RunValidation::Finalise(){
   //-------------------------------------------------------------------------
   
   outfile->cd();
+  tree_stats->Write();
   MRD_t_clusters->Write();
+  MRD_t_clusters_beam->Write();
   MRD_t_clusters_cosmic->Write();
+  FMV_t_clusters->Write();
+  FMV_t_clusters_beam->Write();
+  FMV_t_clusters_cosmic->Write();
   PMT_t_clusters->Write();
   PMT_t_clusters_2pe->Write();
   PMT_t_clusters_5pe->Write();
@@ -622,15 +791,31 @@ bool RunValidation::Finalise(){
   PMT_t_clusters_30pe_full->Write();
   MRD_PMT_t->Write();
   MRD_PMT_t_100pe->Write();
-  MRD_PMT_Deltat->Write();
-  MRD_PMT_Deltat_100pe->Write();
+  MRD_PMT_t_Beam->Write();
+  MRD_PMT_t_100pe_Beam->Write();
   MRD_PMT_t_Cosmic->Write();
   MRD_PMT_t_100pe_Cosmic->Write();
+  FMV_PMT_t->Write();
+  FMV_PMT_t_100pe->Write();
+  FMV_PMT_t_Beam->Write();
+  FMV_PMT_t_100pe_Beam->Write();
+  FMV_PMT_t_Cosmic->Write();
+  FMV_PMT_t_100pe_Cosmic->Write();
+  MRD_PMT_Deltat->Write();
+  MRD_PMT_Deltat_100pe->Write();
+  MRD_PMT_Deltat_Beam->Write();
+  MRD_PMT_Deltat_100pe_Beam->Write();
   MRD_PMT_Deltat_Cosmic->Write();
   MRD_PMT_Deltat_100pe_Cosmic->Write();
   FMV_PMT_Deltat->Write();
   FMV_PMT_Deltat_100pe->Write();
+  FMV_PMT_Deltat_Beam->Write();
+  FMV_PMT_Deltat_Beam_100pe->Write();
+  FMV_PMT_Deltat_Cosmic->Write();
+  FMV_PMT_Deltat_Cosmic_100pe->Write();
   MRD_FMV_Deltat->Write();
+  MRD_FMV_Deltat_Beam->Write();
+  MRD_FMV_Deltat_Cosmic->Write();
   PMT_DelayedMult->Write();
   PMT_DelayedMult_Coinc->Write();
   PMT_DelayedMult_Coinc_NoFMV->Write();
@@ -664,14 +849,18 @@ bool RunValidation::Finalise(){
   ANNIE_counts->Write();
   ANNIE_rates->Write();
   ANNIE_fractions->Write();
+  TriggerRate_Beam->Write();
+  TriggerRate_Beam_Extended->Write();
+  TriggerRate_Cosmic->Write();
+  TriggerRate_LED->Write();
 
   canvas_beamspill->Divide(2,1);
   canvas_beamspill->cd(1);
   PMT_t_clusters_2pe->Rebin(5);
   PMT_t_clusters_2pe->Draw();
   canvas_beamspill->cd(2);
-  MRD_t_clusters->Rebin(5);
-  MRD_t_clusters->Draw();
+  MRD_t_clusters_beam->Rebin(5);
+  MRD_t_clusters_beam->Draw();
   canvas_beamspill->Write();
 
   canvas_mrd_pmt->Divide(2,2);
@@ -745,15 +934,22 @@ bool RunValidation::Finalise(){
 
   if (createImages){
 
-    std::stringstream save_mrd_t, save_mrd_t_cosmic, save_pmt_t, save_pmt_t_2pe, save_pmt_t_5pe, save_pmt_t_10pe, save_pmt_t_30pe, save_pmt_tfull, save_pmt_tfull_2pe, save_pmt_tfull_5pe, save_pmt_tfull_10pe, save_pmt_tfull_30pe;
-    std::stringstream save_mrd_pmt_t, save_mrd_pmt_t_100pe, save_mrd_pmt_deltat, save_mrd_pmt_deltat_100pe, save_mrd_pmt_t_cosmic, save_mrd_pmt_t_100pe_cosmic, save_mrd_pmt_deltat_cosmic, save_mrd_pmt_deltat_100pe_cosmic, save_fmv_pmt_deltat, save_fmv_pmt_deltat_100pe, save_mrd_fmv_deltat;
+    std::stringstream save_mrd_t, save_mrd_t_beam, save_mrd_t_cosmic, save_fmv_t, save_fmv_t_beam, save_fmv_t_cosmic, save_pmt_t, save_pmt_t_2pe, save_pmt_t_5pe, save_pmt_t_10pe, save_pmt_t_30pe, save_pmt_tfull, save_pmt_tfull_2pe, save_pmt_tfull_5pe, save_pmt_tfull_10pe, save_pmt_tfull_30pe;
+    std::stringstream save_mrd_pmt_t, save_mrd_pmt_t_100pe, save_mrd_pmt_deltat, save_mrd_pmt_deltat_100pe, save_mrd_pmt_t_cosmic, save_mrd_pmt_t_100pe_cosmic, save_mrd_pmt_t_beam, save_mrd_pmt_t_100pe_beam, save_mrd_pmt_deltat_cosmic, save_mrd_pmt_deltat_100pe_cosmic, save_mrd_pmt_deltat_beam, save_mrd_pmt_deltat_100pe_beam, save_fmv_pmt_deltat, save_fmv_pmt_deltat_100pe, save_fmv_pmt_deltat_beam, save_fmv_pmt_deltat_cosmic, save_fmv_pmt_deltat_beam_100pe, save_fmv_pmt_deltat_cosmic_100pe, save_mrd_fmv_deltat, save_mrd_fmv_deltat_beam, save_mrd_fmv_deltat_cosmic;
     std::stringstream save_pmt_prompt, save_pmt_prompt_zoom, save_pmt_prompt_10, save_pmt_prompt_mrdcoinc, save_pmt_prompt_mrdcoinc_nofmv, save_pmt_prompt_fmv, save_pmt_prompt_beam, save_pmt_prompt_cosmic, save_pmt_prompt_led, save_pmt_prompt_cb, save_pmt_del, save_pmt_del_zoom, save_pmt_del_10, save_pmt_del_cb, save_pmt_avgq, save_pmt_avgq_100pe;
     std::stringstream save_pmt_chkey, save_mrd_chkey, save_fmv_chkey, save_annie_counts, save_annie_rates, save_annie_fractions;
     std::stringstream save_del_mult, save_del_mult_coinc, save_del_mult_coinc_nofmv, save_del_mult_coinc_nofmv_cb;
     std::stringstream save_adcwaveform, save_triggerwords;
+    std::stringstream save_fmv_pmt_t, save_fmv_pmt_t_100pe, save_fmv_pmt_t_cosmic, save_fmv_pmt_t_100pe_cosmic, save_fmv_pmt_t_beam, save_fmv_pmt_t_100pe_beam;
+    std::stringstream save_trigger_beam, save_trigger_beam_extended, save_trigger_cosmic, save_trigger_led;
+    std::stringstream save_canvas_beamspill, save_canvas_mrd_pmt, save_canvas_triggerwords, save_canvas_prompt_charge, save_canvas_neutron_mult, save_canvas_channelkey, save_canvas_rates;
 
     save_mrd_t << savePath << "R" << GlobalRunNumber << "_MRDTimes.png";
+    save_mrd_t_beam << savePath << "R" << GlobalRunNumber << "_MRDTimesBeam.png";
     save_mrd_t_cosmic << savePath << "R" << GlobalRunNumber << "_MRDTimesCosmic.png";
+    save_fmv_t << savePath << "R" << GlobalRunNumber << "_FMVTimes.png";
+    save_fmv_t_beam << savePath << "R" << GlobalRunNumber << "_FMVTimesBeam.png";
+    save_fmv_t_cosmic << savePath << "R" << GlobalRunNumber << "_FMVTimesCosmic.png";
     save_pmt_t << savePath << "R" << GlobalRunNumber << "_PMTTimes.png";
     save_pmt_t_2pe << savePath << "R" << GlobalRunNumber << "_PMTTimes_2pe.png";
     save_pmt_t_5pe << savePath << "R" << GlobalRunNumber << "_PMTTimes_5pe.png";
@@ -766,15 +962,31 @@ bool RunValidation::Finalise(){
     save_pmt_tfull_30pe << savePath << "R" << GlobalRunNumber << "_PMTTimes_FullWindow_30pe.png";
     save_mrd_pmt_t << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times.png";
     save_mrd_pmt_t_100pe << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times_100pe.png";
-    save_mrd_pmt_deltat << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes.png";
-    save_mrd_pmt_deltat_100pe << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_100pe.png";
     save_mrd_pmt_t_cosmic << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times_Cosmic.png";
     save_mrd_pmt_t_100pe_cosmic << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times_100pe_Cosmic.png";
+    save_mrd_pmt_t_beam << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times_Beam.png";
+    save_mrd_pmt_t_100pe_beam << savePath << "R" << GlobalRunNumber << "_MRDPMT_Times_100pe_Beam.png";
+    save_fmv_pmt_t << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times.png";
+    save_fmv_pmt_t_100pe << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times_100pe.png";
+    save_fmv_pmt_t_cosmic << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times_Cosmic.png";
+    save_fmv_pmt_t_100pe_cosmic << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times_100pe_Cosmic.png";
+    save_fmv_pmt_t_beam << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times_Beam.png";
+    save_fmv_pmt_t_100pe_beam << savePath << "R" << GlobalRunNumber << "_FMVPMT_Times_100pe_Beam.png";
+    save_mrd_pmt_deltat << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes.png";
+    save_mrd_pmt_deltat_100pe << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_100pe.png";
     save_mrd_pmt_deltat_cosmic << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_Cosmic.png";
     save_mrd_pmt_deltat_100pe_cosmic << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_100pe_Cosmic.png";
+    save_mrd_pmt_deltat_beam << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_Beam.png";
+    save_mrd_pmt_deltat_100pe_beam << savePath << "R" << GlobalRunNumber << "_MRDPMT_DeltaTimes_100pe_Beam.png";
     save_fmv_pmt_deltat << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes.png";
     save_fmv_pmt_deltat_100pe << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes_100pe.png";
+    save_fmv_pmt_deltat_beam << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes_Beam.png";
+    save_fmv_pmt_deltat_beam_100pe << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes_Beam_100pe.png";
+    save_fmv_pmt_deltat_cosmic << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes_Cosmic.png";
+    save_fmv_pmt_deltat_cosmic_100pe << savePath << "R" << GlobalRunNumber << "_FMVPMT_DeltaTimes_Cosmic_100pe.png";
     save_mrd_fmv_deltat << savePath << "R" << GlobalRunNumber << "_MRDFMV_DeltaTimes.png";
+    save_mrd_fmv_deltat_beam << savePath << "R" << GlobalRunNumber << "_MRDFMV_DeltaTimes_Beam.png";
+    save_mrd_fmv_deltat_cosmic << savePath << "R" << GlobalRunNumber << "_MRDFMV_DeltaTimes_Cosmic.png";
     save_pmt_prompt << savePath << "R" << GlobalRunNumber << "_PMTCharge_Prompt.png";
     save_pmt_prompt_zoom << savePath << "R" << GlobalRunNumber << "_PMTCharge_Prompt_zoom.png";
     save_pmt_prompt_10 << savePath << "R" << GlobalRunNumber << "_PMTCharge_Prompt_10hits.png";
@@ -803,14 +1015,38 @@ bool RunValidation::Finalise(){
     save_del_mult_coinc_nofmv_cb << savePath << "R" << GlobalRunNumber << "_DelayedMult_Coinc_NoFMV_CB.png";
     save_adcwaveform << savePath << "R" << GlobalRunNumber << "_ADCWaveform.png";
     save_triggerwords << savePath << "R" << GlobalRunNumber << "_Triggerwords.png";
+    save_trigger_beam << savePath << "R" << GlobalRunNumber << "_TriggerRatesBeam.png";
+    save_trigger_beam_extended << savePath << "R" << GlobalRunNumber << "_TriggerRatesBeamExtended.png";
+    save_trigger_cosmic << savePath << "R" << GlobalRunNumber << "_TriggerRatesCosmic.png";
+    save_trigger_led << savePath << "R" << GlobalRunNumber << "_TriggerRatesLED.png";
+    save_canvas_beamspill << savePath << "R" << GlobalRunNumber << "_CanvasBeamSpill.png";
+    save_canvas_mrd_pmt << savePath << "R" << GlobalRunNumber << "_CanvasMRDPMT.png";
+    save_canvas_triggerwords << savePath << "R" << GlobalRunNumber << "_CanvasTriggerWords.png";
+    save_canvas_prompt_charge << savePath << "R" << GlobalRunNumber << "_CanvasPromptCharge.png";
+    save_canvas_neutron_mult << savePath << "R" << GlobalRunNumber << "_CanvasNeutronMult.png";
+    save_canvas_channelkey << savePath << "R" << GlobalRunNumber << "_CanvasChannelkey.png";
+    save_canvas_rates << savePath << "R" << GlobalRunNumber << "_CanvasRates.png";
+
 
     TCanvas *canvas = new TCanvas("canvas","Canvas",900,600);
     canvas->cd();
     MRD_t_clusters->Draw();
     canvas->SaveAs(save_mrd_t.str().c_str());
     canvas->Clear();
+    MRD_t_clusters_beam->Draw();
+    canvas->SaveAs(save_mrd_t_beam.str().c_str());
+    canvas->Clear();
     MRD_t_clusters_cosmic->Draw();
     canvas->SaveAs(save_mrd_t_cosmic.str().c_str());
+    canvas->Clear();
+    FMV_t_clusters->Draw();
+    canvas->SaveAs(save_fmv_t.str().c_str());
+    canvas->Clear();
+    FMV_t_clusters_beam->Draw();
+    canvas->SaveAs(save_fmv_t_beam.str().c_str());
+    canvas->Clear();
+    FMV_t_clusters_cosmic->Draw();
+    canvas->SaveAs(save_fmv_t_cosmic.str().c_str());
     canvas->Clear();
     PMT_t_clusters->Draw();
     canvas->SaveAs(save_pmt_t.str().c_str());
@@ -848,11 +1084,11 @@ bool RunValidation::Finalise(){
     MRD_PMT_t_100pe->Draw();
     canvas->SaveAs(save_mrd_pmt_t_100pe.str().c_str());
     canvas->Clear();
-    MRD_PMT_Deltat->Draw();
-    canvas->SaveAs(save_mrd_pmt_deltat.str().c_str());
+    MRD_PMT_t_Beam->Draw();
+    canvas->SaveAs(save_mrd_pmt_t_beam.str().c_str());
     canvas->Clear();
-    MRD_PMT_Deltat_100pe->Draw();
-    canvas->SaveAs(save_mrd_pmt_deltat_100pe.str().c_str());
+    MRD_PMT_t_100pe_Beam->Draw();
+    canvas->SaveAs(save_mrd_pmt_t_100pe_beam.str().c_str());
     canvas->Clear();
     MRD_PMT_t_Cosmic->Draw();
     canvas->SaveAs(save_mrd_pmt_t_cosmic.str().c_str());
@@ -860,17 +1096,59 @@ bool RunValidation::Finalise(){
     MRD_PMT_t_100pe_Cosmic->Draw();
     canvas->SaveAs(save_mrd_pmt_t_100pe_cosmic.str().c_str());
     canvas->Clear();
+    FMV_PMT_t->Draw();
+    canvas->SaveAs(save_fmv_pmt_t.str().c_str());
+    canvas->Clear();
+    FMV_PMT_t_100pe->Draw();
+    canvas->SaveAs(save_fmv_pmt_t_100pe.str().c_str());
+    canvas->Clear();
+    FMV_PMT_t_Beam->Draw();
+    canvas->SaveAs(save_fmv_pmt_t_beam.str().c_str());
+    canvas->Clear();
+    FMV_PMT_t_100pe_Beam->Draw();
+    canvas->SaveAs(save_fmv_pmt_t_100pe_beam.str().c_str());
+    canvas->Clear();
+    FMV_PMT_t_Cosmic->Draw();
+    canvas->SaveAs(save_fmv_pmt_t_cosmic.str().c_str());
+    canvas->Clear();
+    FMV_PMT_t_100pe_Cosmic->Draw();
+    canvas->SaveAs(save_fmv_pmt_t_100pe_cosmic.str().c_str());
+    canvas->Clear();
+    MRD_PMT_Deltat->Draw();
+    canvas->SaveAs(save_mrd_pmt_deltat.str().c_str());
+    canvas->Clear();
+    MRD_PMT_Deltat_100pe->Draw();
+    canvas->SaveAs(save_mrd_pmt_deltat_100pe.str().c_str());
+    canvas->Clear();
     MRD_PMT_Deltat_Cosmic->Draw();
     canvas->SaveAs(save_mrd_pmt_deltat_cosmic.str().c_str());
     canvas->Clear();
     MRD_PMT_Deltat_100pe_Cosmic->Draw();
     canvas->SaveAs(save_mrd_pmt_deltat_100pe_cosmic.str().c_str());
     canvas->Clear();
+    MRD_PMT_Deltat_Beam->Draw();
+    canvas->SaveAs(save_mrd_pmt_deltat_beam.str().c_str());
+    canvas->Clear();
+    MRD_PMT_Deltat_100pe_Beam->Draw();
+    canvas->SaveAs(save_mrd_pmt_deltat_100pe_beam.str().c_str());
+    canvas->Clear();
     FMV_PMT_Deltat->Draw();
     canvas->SaveAs(save_fmv_pmt_deltat.str().c_str());
     canvas->Clear();
     FMV_PMT_Deltat_100pe->Draw();
     canvas->SaveAs(save_fmv_pmt_deltat_100pe.str().c_str());
+    canvas->Clear();
+    FMV_PMT_Deltat_Beam->Draw();
+    canvas->SaveAs(save_fmv_pmt_deltat_beam.str().c_str());
+    canvas->Clear();
+    FMV_PMT_Deltat_Beam_100pe->Draw();
+    canvas->SaveAs(save_fmv_pmt_deltat_beam_100pe.str().c_str());
+    canvas->Clear();
+    FMV_PMT_Deltat_Cosmic->Draw();
+    canvas->SaveAs(save_fmv_pmt_deltat_cosmic.str().c_str());
+    canvas->Clear();
+    FMV_PMT_Deltat_Cosmic_100pe->Draw();
+    canvas->SaveAs(save_fmv_pmt_deltat_cosmic_100pe.str().c_str());
     canvas->Clear();
     MRD_FMV_Deltat->Draw();
     canvas->SaveAs(save_mrd_fmv_deltat.str().c_str());
@@ -959,6 +1237,25 @@ bool RunValidation::Finalise(){
     Triggerwords->Draw();
     canvas->SaveAs(save_triggerwords.str().c_str());
     canvas->Clear();
+    TriggerRate_Beam->Draw();
+    canvas->SaveAs(save_trigger_beam.str().c_str());
+    canvas->Clear();
+    TriggerRate_Beam_Extended->Draw();
+    canvas->SaveAs(save_trigger_beam_extended.str().c_str());
+    canvas->Clear();
+    TriggerRate_Cosmic->Draw();
+    canvas->SaveAs(save_trigger_cosmic.str().c_str());
+    canvas->Clear();
+    TriggerRate_LED->Draw();
+    canvas->SaveAs(save_trigger_led.str().c_str());
+    canvas->Clear();
+    canvas_beamspill->SaveAs(save_canvas_beamspill.str().c_str());
+    canvas_mrd_pmt->SaveAs(save_canvas_mrd_pmt.str().c_str());
+    canvas_triggerwords->SaveAs(save_canvas_triggerwords.str().c_str());
+    canvas_prompt_charge->SaveAs(save_canvas_prompt_charge.str().c_str());
+    canvas_neutron_mult->SaveAs(save_canvas_neutron_mult.str().c_str());
+    canvas_channelkey->SaveAs(save_canvas_channelkey.str().c_str());
+    canvas_rates->SaveAs(save_canvas_rates.str().c_str());
   }
 
   outfile->Close();
@@ -978,13 +1275,21 @@ void RunValidation::DefineHistograms(){
     outfile = new TFile(file_name.str().c_str(),"RECREATE");
     outfile->cd();
 
-    std::stringstream title_mrd, title_mrd_cosmic, title_pmt, title_pmt_2pe, title_pmt_5pe, title_pmt_10pe, title_pmt_30pe, title_mrd_pmt, title_mrd_pmt_100pe, title_mrd_pmt_delta, title_mrd_pmt_delta_100pe, title_mrd_pmt_cosmic, title_mrd_pmt_100pe_cosmic, title_mrd_pmt_delta_cosmic, title_mrd_pmt_delta_100pe_cosmic, title_fmv_pmt_delta, title_fmv_pmt_delta_100pe, title_mrd_fmv_delta, title_pmt_prompt, title_pmt_prompt_10, title_pmt_prompt_MRDCoinc, title_pmt_prompt_MRDCoinc_NoFMV, title_pmt_prompt_FMV, title_pmt_prompt_beam, title_pmt_prompt_cosmic, title_pmt_prompt_led, title_pmt_prompt_CB, title_chargeperpmt, title_chargeperpmt_100pe, title_pmt_delayed, title_pmt_delayed_10, title_pmt_delayed_CB, title_counts, title_rates, title_fractions, title_delayed_mult, title_delayed_mult_coinc, title_delayed_mult_coinc_nofmv, title_delayed_mult_coinc_nofmv_cb, title_delayed_time, title_delayed_time_cb, title_delayed_time_coinc, title_delayed_time_coinc_nofmv, title_delayed_time_coinc_nofmv_cb, title_adcwaveform_samples, title_pmt_chankeys, title_mrd_chankeys, title_fmv_chankeys, title_triggerwords;
+    std::stringstream title_mrd, title_mrd_beam, title_mrd_cosmic, title_fmv, title_fmv_beam, title_fmv_cosmic, title_pmt, title_pmt_2pe, title_pmt_5pe, title_pmt_10pe, title_pmt_30pe, title_mrd_pmt, title_mrd_pmt_100pe, title_mrd_pmt_delta, title_mrd_pmt_delta_100pe, title_mrd_pmt_cosmic, title_mrd_pmt_100pe_cosmic, title_mrd_pmt_delta_cosmic, title_mrd_pmt_delta_100pe_cosmic, title_fmv_pmt_delta, title_fmv_pmt_delta_100pe, title_mrd_fmv_delta, title_pmt_prompt, title_pmt_prompt_10, title_pmt_prompt_MRDCoinc, title_pmt_prompt_MRDCoinc_NoFMV, title_pmt_prompt_FMV, title_pmt_prompt_beam, title_pmt_prompt_cosmic, title_pmt_prompt_led, title_pmt_prompt_CB, title_chargeperpmt, title_chargeperpmt_100pe, title_pmt_delayed, title_pmt_delayed_10, title_pmt_delayed_CB, title_counts, title_rates, title_fractions, title_delayed_mult, title_delayed_mult_coinc, title_delayed_mult_coinc_nofmv, title_delayed_mult_coinc_nofmv_cb, title_delayed_time, title_delayed_time_cb, title_delayed_time_coinc, title_delayed_time_coinc_nofmv, title_delayed_time_coinc_nofmv_cb, title_adcwaveform_samples, title_pmt_chankeys, title_mrd_chankeys, title_fmv_chankeys, title_triggerwords;
 
     std::stringstream title_pmt_led, title_pmt_2pe_led, title_pmt_5pe_led, title_pmt_10pe_led, title_pmt_30pe_led;
     std::stringstream title_pmt_cosmics, title_pmt_2pe_cosmics, title_pmt_5pe_cosmics, title_pmt_10pe_cosmics, title_pmt_30pe_cosmics;
 
+    std::stringstream title_mrd_pmt_beam, title_mrd_pmt_100pe_beam, title_mrd_pmt_delta_beam, title_mrd_pmt_delta_100pe_beam;
+    std::stringstream title_fmv_pmt_delta_beam, title_fmv_pmt_delta_beam_100pe, title_fmv_pmt_delta_cosmic, title_fmv_pmt_delta_cosmic_100pe, title_mrd_fmv_delta_beam, title_mrd_fmv_delta_cosmic;
+    std::stringstream title_fmv_pmt, title_fmv_pmt_100pe, title_fmv_pmt_beam, title_fmv_pmt_100pe_beam, title_fmv_pmt_cosmic, title_fmv_pmt_100pe_cosmic;
+
     title_mrd << "MRD Cluster Times - Run "<<GlobalRunNumber;
+    title_mrd_beam << "MRD Cluster Times (Beam) - Run "<<GlobalRunNumber;
     title_mrd_cosmic << "MRD Cluster Times (Cosmic) - Run "<<GlobalRunNumber;
+    title_fmv << "FMV Cluster Times - Run "<<GlobalRunNumber;
+    title_fmv_beam << "FMV Cluster Times (Beam) - Run "<<GlobalRunNumber;
+    title_fmv_cosmic << "FMV Cluster Times (Cosmic) - Run "<<GlobalRunNumber;
     title_pmt << "PMT Cluster Times - Run "<<GlobalRunNumber;
     title_pmt_2pe << "PMT Cluster Times (>2 p.e.) - Run "<<GlobalRunNumber;
     title_pmt_5pe << "PMT Cluster Times (>5 p.e.) - Run "<<GlobalRunNumber;
@@ -1002,15 +1307,29 @@ void RunValidation::DefineHistograms(){
     title_pmt_30pe_cosmics << "PMT Cluster Times - Cosmic triggerword (>30 p.e.) - Run "<<GlobalRunNumber;
     title_mrd_pmt << "MRD vs. PMT Cluster Times - Run "<<GlobalRunNumber;
     title_mrd_pmt_100pe << "MRD vs. PMT Cluster Times (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_mrd_pmt_beam << "MRD vs. PMT Cluster Times Beam - Run "<<GlobalRunNumber;
+    title_mrd_pmt_100pe_beam << "MRD vs. PMT Cluster Times Beam (>100 p.e.) - Run "<<GlobalRunNumber;
     title_mrd_pmt_delta << "Difference MRD/PMT Cluster Times - Run "<<GlobalRunNumber;
     title_mrd_pmt_delta_100pe << "Difference MRD/PMT Cluster Times (>100 p.e.) - Run "<<GlobalRunNumber;
     title_mrd_pmt_cosmic << "MRD vs. PMT Cluster Times Cosmics - Run "<<GlobalRunNumber;
     title_mrd_pmt_100pe_cosmic << "MRD vs. PMT Cluster Times Cosmics (>100 p.e.) - Run "<<GlobalRunNumber;
     title_mrd_pmt_delta_cosmic << "Difference MRD/PMT Cluster Times Cosmics - Run "<<GlobalRunNumber;
     title_mrd_pmt_delta_100pe_cosmic << "Difference MRD/PMT Cluster Times Cosmics (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_fmv_pmt << "FMV vs. PMT Cluster Times - Run "<<GlobalRunNumber;
+    title_fmv_pmt_100pe << "FMV vs. PMT Cluster Times (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_fmv_pmt_beam << "FMV vs. PMT Cluster Times - Beam - Run "<<GlobalRunNumber;
+    title_fmv_pmt_100pe_beam << "FMV vs. PMT Cluster Times - Beam (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_fmv_pmt_cosmic << "FMV vs. PMT Cluster Times - Cosmic - Run "<<GlobalRunNumber;
+    title_fmv_pmt_100pe_cosmic << "FMV vs. PMT Cluster Times - Cosmic (>100 p.e.) - Run "<<GlobalRunNumber;
     title_fmv_pmt_delta << "Difference FMV/PMT Cluster Times - Run "<<GlobalRunNumber;
     title_fmv_pmt_delta_100pe << "Difference FMV/PMT Cluster Times (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_fmv_pmt_delta_beam << "Difference FMV/PMT Cluster Times - Beam - Run "<<GlobalRunNumber;
+    title_fmv_pmt_delta_beam_100pe << "Difference FMV/PMT Cluster Times - Beam (>100 p.e.) - Run "<<GlobalRunNumber;
+    title_fmv_pmt_delta_cosmic << "Difference FMV/PMT Cluster Times - Cosmic - Run "<<GlobalRunNumber;
+    title_fmv_pmt_delta_cosmic_100pe << "Difference FMV/PMT Cluster Times - Cosmic (>100 p.e.) - Run "<<GlobalRunNumber;
     title_mrd_fmv_delta << "Difference MRD/FMV Cluster Times - Run "<<GlobalRunNumber;
+    title_mrd_fmv_delta_beam << "Difference MRD/FMV Cluster Times - Beam - Run "<<GlobalRunNumber;
+    title_mrd_fmv_delta_cosmic << "Difference MRD/FMV Cluster Times - Cosmic - Run "<<GlobalRunNumber;
     title_pmt_prompt << "PMT Prompt Charge - Run "<<GlobalRunNumber;
     title_pmt_prompt_10 << "PMT Prompt Charge (>10 hits) - Run "<<GlobalRunNumber;
     title_pmt_prompt_MRDCoinc << "PMT Prompt Charge (MRD Coinc) - Run "<<GlobalRunNumber;
@@ -1028,9 +1347,9 @@ void RunValidation::DefineHistograms(){
     title_pmt_chankeys << "PMT Channelkeys - Run "<<GlobalRunNumber;
     title_mrd_chankeys << "MRD Channelkeys - Run "<<GlobalRunNumber;
     title_fmv_chankeys << "FMV Channelkeys - Run "<<GlobalRunNumber;
-    title_counts << "ANNIE Counts - Run "<<GlobalRunNumber;
-    title_rates << " ANNIE Rates - Run "<<GlobalRunNumber;
-    title_fractions << " ANNIE Event Fractions - Run "<<GlobalRunNumber;
+    title_counts << "ANNIE Beam Trigger Counts - Run "<<GlobalRunNumber;
+    title_rates << " ANNIE Beam Trigger Rates - Run "<<GlobalRunNumber;
+    title_fractions << " ANNIE Beam Trigger Event Fractions - Run "<<GlobalRunNumber;
     title_delayed_mult << "Neutron Candidate Multiplicity Distribution - Run "<<GlobalRunNumber;
     title_delayed_mult_coinc << "Neutron Candidate Multiplicity Distribution (MRD/Tank coincidence) - Run "<<GlobalRunNumber;
     title_delayed_mult_coinc_nofmv << "Neutron Candidate Multiplicity Distribution (MRD/Tank coincidence, No FMV) - Run "<<GlobalRunNumber;
@@ -1044,7 +1363,11 @@ void RunValidation::DefineHistograms(){
     title_triggerwords << "Triggerwords - Run "<<GlobalRunNumber;   
 
     MRD_t_clusters = new TH1D("MRD_t_clusters",title_mrd.str().c_str(),250,0,4000);
-    MRD_t_clusters_cosmic = new TH1D("MRD_t_clusters_cosmic",title_mrd.str().c_str(),250,0,4000);
+    MRD_t_clusters_beam = new TH1D("MRD_t_clusters_beam",title_mrd_beam.str().c_str(),250,0,4000);
+    MRD_t_clusters_cosmic = new TH1D("MRD_t_clusters_cosmic",title_mrd_cosmic.str().c_str(),250,0,4000);
+    FMV_t_clusters = new TH1D("FMV_t_clusters",title_fmv.str().c_str(),250,0,4000);
+    FMV_t_clusters_beam = new TH1D("FMV_t_clusters_beam",title_fmv_beam.str().c_str(),250,0,4000);
+    FMV_t_clusters_cosmic = new TH1D("FMV_t_clusters_cosmic",title_fmv_cosmic.str().c_str(),250,0,4000);
     PMT_t_clusters = new TH1D("PMT_t_clusters",title_pmt.str().c_str(),250,0,2000);
     PMT_t_clusters_2pe = new TH1D("PMT_t_clusters_2pe",title_pmt_2pe.str().c_str(),250,0,2000);
     PMT_t_clusters_5pe = new TH1D("PMT_t_clusters_5pe",title_pmt_5pe.str().c_str(),250,0,2000);
@@ -1067,15 +1390,31 @@ void RunValidation::DefineHistograms(){
     PMT_t_clusters_30pe_full = new TH1D("PMT_t_clusters_30pe_full",title_pmt_30pe.str().c_str(),500,0,75000);
     MRD_PMT_t = new TH2D("MRD_PMT_t",title_mrd_pmt.str().c_str(),50,0,4000,50,0,2000);
     MRD_PMT_t_100pe = new TH2D("MRD_PMT_t_100pe",title_mrd_pmt_100pe.str().c_str(),50,0,4000,50,0,2000);
-    MRD_PMT_Deltat = new TH1D("MRD_PMT_Deltat",title_mrd_pmt_delta.str().c_str(),500,-2000,4000);
-    MRD_PMT_Deltat_100pe = new TH1D("MRD_PMT_Deltat_100pe",title_mrd_pmt_delta_100pe.str().c_str(),500,-2000,4000);
+    MRD_PMT_t_Beam = new TH2D("MRD_PMT_t_Beam",title_mrd_pmt_beam.str().c_str(),50,0,4000,50,0,2000);
+    MRD_PMT_t_100pe_Beam = new TH2D("MRD_PMT_t_100pe_Beam",title_mrd_pmt_100pe_beam.str().c_str(),50,0,4000,50,0,2000);
     MRD_PMT_t_Cosmic = new TH2D("MRD_PMT_t_Cosmic",title_mrd_pmt_cosmic.str().c_str(),50,0,4000,50,0,2000);
     MRD_PMT_t_100pe_Cosmic = new TH2D("MRD_PMT_t_100pe_Cosmic",title_mrd_pmt_100pe_cosmic.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t = new TH2D("FMV_PMT_t",title_fmv_pmt.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t_100pe = new TH2D("FMV_PMT_t_100pe",title_fmv_pmt_100pe.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t_Beam = new TH2D("FMV_PMT_t_Beam",title_fmv_pmt_beam.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t_100pe_Beam = new TH2D("FMV_PMT_t_100pe_Beam",title_fmv_pmt_100pe_beam.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t_Cosmic = new TH2D("FMV_PMT_t_Cosmic",title_fmv_pmt_cosmic.str().c_str(),50,0,4000,50,0,2000);
+    FMV_PMT_t_100pe_Cosmic = new TH2D("FMV_PMT_t_100pe_Cosmic",title_fmv_pmt_100pe_cosmic.str().c_str(),50,0,4000,50,0,2000);
+    MRD_PMT_Deltat = new TH1D("MRD_PMT_Deltat",title_mrd_pmt_delta.str().c_str(),500,-2000,4000);
+    MRD_PMT_Deltat_100pe = new TH1D("MRD_PMT_Deltat_100pe",title_mrd_pmt_delta_100pe.str().c_str(),500,-2000,4000);
+    MRD_PMT_Deltat_Beam = new TH1D("MRD_PMT_Deltat_Beam",title_mrd_pmt_delta_beam.str().c_str(),500,-2000,4000);
+    MRD_PMT_Deltat_100pe_Beam = new TH1D("MRD_PMT_Deltat_100pe_Beam",title_mrd_pmt_delta_100pe_beam.str().c_str(),500,-2000,4000);
     MRD_PMT_Deltat_Cosmic = new TH1D("MRD_PMT_Deltat_Cosmic",title_mrd_pmt_delta_cosmic.str().c_str(),500,-2000,4000);
     MRD_PMT_Deltat_100pe_Cosmic = new TH1D("MRD_PMT_Deltat_100pe_Cosmic",title_mrd_pmt_delta_100pe_cosmic.str().c_str(),500,-2000,4000);
     FMV_PMT_Deltat = new TH1D("FMV_PMT_Deltat",title_fmv_pmt_delta.str().c_str(),500,-2000,4000);
     FMV_PMT_Deltat_100pe = new TH1D("FMV_PMT_Deltat_100pe",title_fmv_pmt_delta_100pe.str().c_str(),500,-2000,4000);
+    FMV_PMT_Deltat_Beam = new TH1D("FMV_PMT_Deltat_Beam",title_fmv_pmt_delta_beam.str().c_str(),500,-2000,4000);
+    FMV_PMT_Deltat_Beam_100pe = new TH1D("FMV_PMT_Deltat_Beam_100pe",title_fmv_pmt_delta_beam_100pe.str().c_str(),500,-2000,4000);
+    FMV_PMT_Deltat_Cosmic = new TH1D("FMV_PMT_Deltat_Cosmic",title_fmv_pmt_delta_cosmic.str().c_str(),500,-2000,4000);
+    FMV_PMT_Deltat_Cosmic_100pe = new TH1D("FMV_PMT_Deltat_Cosmic_100pe",title_fmv_pmt_delta_cosmic_100pe.str().c_str(),500,-2000,4000);
     MRD_FMV_Deltat = new TH1D("MRD_FMV_Deltat",title_mrd_fmv_delta.str().c_str(),500,-2000,4000);
+    MRD_FMV_Deltat_Beam = new TH1D("MRD_FMV_Deltat_Beam",title_mrd_fmv_delta_beam.str().c_str(),500,-2000,4000);
+    MRD_FMV_Deltat_Cosmic = new TH1D("MRD_FMV_Deltat_Cosmic",title_mrd_fmv_delta_cosmic.str().c_str(),500,-2000,4000);
     PMT_prompt_charge = new TH1D("PMT_prompt_charge",title_pmt_prompt.str().c_str(),200,0,5000);
     PMT_delayed_charge = new TH1D("PMT_delayed_charge",title_pmt_delayed.str().c_str(),200,0,5000);
     PMT_prompt_charge_zoom = new TH1D("PMT_prompt_charge_zoom",title_pmt_prompt.str().c_str(),200,0,500);
@@ -1111,7 +1450,11 @@ void RunValidation::DefineHistograms(){
     Triggerwords = new TH1D("Triggerwords",title_triggerwords.str().c_str(),60,0,60);
 
     MRD_t_clusters->GetXaxis()->SetTitle("t_{MRD} [ns]");
+    MRD_t_clusters_beam->GetXaxis()->SetTitle("t_{MRD} [ns]");
     MRD_t_clusters_cosmic->GetXaxis()->SetTitle("t_{MRD} [ns]");
+    FMV_t_clusters->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_t_clusters_beam->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_t_clusters_cosmic->GetXaxis()->SetTitle("t_{FMV} [ns]");
     PMT_t_clusters->GetXaxis()->SetTitle("t_{PMT} [ns]");
     PMT_t_clusters_2pe->GetXaxis()->SetTitle("t_{PMT} [ns]");
     PMT_t_clusters_5pe->GetXaxis()->SetTitle("t_{PMT} [ns]");
@@ -1136,17 +1479,41 @@ void RunValidation::DefineHistograms(){
     MRD_PMT_t->GetYaxis()->SetTitle("t_{PMT} [ns]");
     MRD_PMT_t_100pe->GetXaxis()->SetTitle("t_{MRD} [ns]");
     MRD_PMT_t_100pe->GetYaxis()->SetTitle("t_{PMT} [ns]");
-    MRD_PMT_Deltat->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
-    MRD_PMT_Deltat_100pe->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
+    MRD_PMT_t_Beam->GetXaxis()->SetTitle("t_{MRD} [ns]");
+    MRD_PMT_t_Beam->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    MRD_PMT_t_100pe_Beam->GetXaxis()->SetTitle("t_{MRD} [ns]");
+    MRD_PMT_t_100pe_Beam->GetYaxis()->SetTitle("t_{PMT} [ns]");
     MRD_PMT_t_Cosmic->GetXaxis()->SetTitle("t_{MRD} [ns]");
     MRD_PMT_t_Cosmic->GetYaxis()->SetTitle("t_{PMT} [ns]");
     MRD_PMT_t_100pe_Cosmic->GetXaxis()->SetTitle("t_{MRD} [ns]");
     MRD_PMT_t_100pe_Cosmic->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t_100pe->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t_100pe->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t_Beam->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t_Beam->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t_100pe_Beam->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t_100pe_Beam->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t_Cosmic->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t_Cosmic->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    FMV_PMT_t_100pe_Cosmic->GetXaxis()->SetTitle("t_{FMV} [ns]");
+    FMV_PMT_t_100pe_Cosmic->GetYaxis()->SetTitle("t_{PMT} [ns]");
+    MRD_PMT_Deltat->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
+    MRD_PMT_Deltat_100pe->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
+    MRD_PMT_Deltat_Beam->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
+    MRD_PMT_Deltat_100pe_Beam->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
     MRD_PMT_Deltat_Cosmic->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
     MRD_PMT_Deltat_100pe_Cosmic->GetXaxis()->SetTitle("t_{MRD}-t_{PMT} [ns]");
     FMV_PMT_Deltat->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
     FMV_PMT_Deltat_100pe->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
+    FMV_PMT_Deltat_Beam->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
+    FMV_PMT_Deltat_Beam_100pe->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
+    FMV_PMT_Deltat_Cosmic->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
+    FMV_PMT_Deltat_Cosmic_100pe->GetXaxis()->SetTitle("t_{FMV}-t_{PMT} [ns]");
     MRD_FMV_Deltat->GetXaxis()->SetTitle("t_{MRD}-t_{FMV} [ns]");
+    MRD_FMV_Deltat_Beam->GetXaxis()->SetTitle("t_{MRD}-t_{FMV} [ns]");
+    MRD_FMV_Deltat_Cosmic->GetXaxis()->SetTitle("t_{MRD}-t_{FMV} [ns]");
     PMT_prompt_charge->GetXaxis()->SetTitle("q_{prompt} [p.e.]");
     PMT_prompt_charge_10hits->GetXaxis()->SetTitle("q_{prompt} [p.e.]");
     PMT_prompt_charge_zoom->GetXaxis()->SetTitle("q_{prompt} [p.e.]");

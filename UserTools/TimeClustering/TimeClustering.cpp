@@ -182,7 +182,7 @@ bool TimeClustering::Execute(){
 	}
 	
 	if (isData){
-		std::cout <<"TimeClustering tool: Data file: Getting TDCData object"<<std::endl;
+		if (verbosity > 0) std::cout <<"TimeClustering tool: Data file: Getting TDCData object"<<std::endl;
 		get_ok = m_data->Stores.at("ANNIEEvent")->Get("TDCData",TDCData);  // a std::map<unsigned long,vector<Hit>>
 
 		if(not get_ok){
