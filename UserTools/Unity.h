@@ -158,3 +158,4 @@
 #include "TimeDistributions.h"
 #include "BeamRate.h"
 #include "LoadRunInfo.h"
+#include "VtxSeedFineGrid.h"

@@ -32,6 +32,13 @@
 #include "TList.h"
 #include "TFile.h"
 #include "TLatex.h"
+#include "TGeoManager.h"
+#include "TGeoMaterial.h"
+#include "TGeoMedium.h"
+#include "TGeoVolume.h"
+#include "TGeoNode.h"
+#include "TGeoSphere.h"
+
 
 
 class EventDisplay: public Tool {
@@ -62,6 +69,7 @@ class EventDisplay: public Tool {
   void translate_xy(double vtxX, double vtxY, double vtxZ, double &xWall, double &yWall, int &status_hit, double &phi_calc);
   void find_projected_xyz(double vtxX, double vtxY, double vtxZ, double dirX, double dirY, double dirZ, double &projected_x, double &projected_y, double &projected_z);
   void ParseUserInput(std::string user_string);
+  void reset_3d();  //JH
 
  private:
 
@@ -108,6 +116,7 @@ class EventDisplay: public Tool {
     bool draw_ring_temp;
     bool draw_vertex_temp;
     bool use_filtered_digits;
+    double exit_pt_min_charge;  //JH
 
     //define event variables
     uint32_t evnum;
@@ -179,6 +188,8 @@ class EventDisplay: public Tool {
     std::map<unsigned long, std::vector<double>> mrd_x, mrd_y, mrd_z;
     std::map<unsigned long, int> mrd_orientation, mrd_half, mrd_side;
 
+    std::map<unsigned long, TGeoVolume *> tank_3d;
+
     //bool variables for schematic hit plot
     bool facc_hit;
     bool tank_hit;
@@ -215,6 +226,18 @@ class EventDisplay: public Tool {
     TText *title_mrd_side = nullptr;
     TText *title_mrd_top = nullptr;
     std::map<unsigned long, TBox*> mrd_paddles, box_mrd_paddles;
+
+    TBox *exit_pt = nullptr;  //JH
+    TGeoManager *ageom = nullptr;
+    TGeoMaterial *vacuum = nullptr;
+    TGeoMaterial *Fe = nullptr;
+    TGeoMedium *Air = nullptr;
+    TGeoMedium *Iron = nullptr;
+    TGeoVolume *EXPH = nullptr;  //experimental hall
+    char blockName[100];  //char array to form strings w/ sprintf
+    int N = 0, maxN = 0;  //Nth node
+    TGeoVolume *bBlock = nullptr;   //building block of PMTs
+    std::map<unsigned long, int> detkey_to_node;
 
 
     //chankey WCSim ID mappings
@@ -253,6 +276,8 @@ class EventDisplay: public Tool {
     double min_time_overall;
     double max_cluster_time;
     double min_cluster_time;
+    unsigned long maximum_pmts_detkey;  //JH
+    unsigned long maximum_time_pmts_detkey;
 
     //sizes for drawings
     double size_top_drawing=0.1;
@@ -266,6 +291,7 @@ class EventDisplay: public Tool {
     TCanvas *canvas_pmt_supplementary;
     TCanvas *canvas_lappd;
     TPaveText* text_event_info = nullptr;
+    TCanvas *canvas_3d;
 
     //markers
     std::vector<TMarker*> vector_colordot;

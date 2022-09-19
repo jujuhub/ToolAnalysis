@@ -13,6 +13,7 @@
 #include "TTree.h"
 #include "TH1D.h"
 #include "TMath.h"
+#include "TGraph.h"
 #include "ADCPulse.h"
 #include "Waveform.h"
 #include "CalibratedADCWaveform.h"
@@ -49,6 +50,7 @@ class PhaseIITreeMaker: public Tool {
   void LoadTankClusterHitsMC(std::vector<MCHit> cluster_hits,std::vector<unsigned long> cluster_detkeys);
   bool LoadTankClusterClassifiers(double cluster_time);
   void LoadAllTankHits(bool IsData);
+  void LoadAllTankRecoDigits();
   void LoadSiPMHits();
 
  private:
@@ -125,6 +127,18 @@ class PhaseIITreeMaker: public Tool {
   std::vector<int> fHitDetID;
   std::vector<int> fHitChankey;
   std::vector<int> fHitChankeyMC;
+
+  // Tank RecoDigits
+  int fNRecoDigits = 0;
+  std::vector<int> fRecoDigitIsFiltered;
+  std::vector<double> fRecoDigitX;
+  std::vector<double> fRecoDigitY;
+  std::vector<double> fRecoDigitZ;
+  std::vector<double> fRecoDigitT;
+  std::vector<double> fRecoDigitQ; 
+  std::vector<double> fRecoDigitPE; 
+  std::vector<int> fRecoDigitType;
+  std::vector<int> fRecoDigitDetID;
 
   // MRD hit info 
   int fVetoHit;
@@ -304,6 +318,7 @@ class PhaseIITreeMaker: public Tool {
   double fDeltaAzimuth;
   double fDeltaZenith;  
   double fDeltaAngle;
+  TGraph *gr_deltaRvAngle; 
   
 
   /// \brief Integer that determines the level of logging to perform
@@ -320,6 +335,7 @@ class PhaseIITreeMaker: public Tool {
   bool MRDClusterProcessing = 0;
   bool TriggerProcessing = 1;
   bool TankHitInfo_fill = 0;
+  bool TankRecoDigitInfo_fill = 0;
   bool MRDHitInfo_fill = 0;
   bool fillCleanEventsOnly = 0; //Only output events not flagged by EventSelector tool
   bool MCTruth_fill = 0; //Output the MC truth information

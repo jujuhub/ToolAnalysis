@@ -36,6 +36,8 @@ class VtxExtendedVertexFinder: public Tool {
   // \brief maximum of fit time window
   double fTmax;
 
+  double fMeanTime;
+
   /// \brief 
   RecoVertex* FitExtendedVertex(RecoVertex* myvertex);
   
@@ -52,7 +54,9 @@ class VtxExtendedVertexFinder: public Tool {
   void PushExtendedVertex(RecoVertex* vtx, bool savetodisk);
   
   bool fUseTrueVertexAsSeed;
+  bool fUsePointVertexAsSeed;
   bool fSeedGridFits;
+  bool fUseMeanTimeAsSeed;
   
   RecoVertex* fTrueVertex = 0;
   std::vector<RecoDigit>* fDigitList = 0;

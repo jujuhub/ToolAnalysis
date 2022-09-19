@@ -18,6 +18,7 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("IsData",isData);
   m_variables.Get("HasGenie",hasGenie);
   m_variables.Get("TankHitInfo_fill", TankHitInfo_fill);
+  m_variables.Get("TankRecoDigitInfo_fill", TankRecoDigitInfo_fill);
   m_variables.Get("MRDHitInfo_fill", MRDHitInfo_fill);
   m_variables.Get("fillCleanEventsOnly", fillCleanEventsOnly);
   m_variables.Get("MCTruth_fill", MCTruth_fill);
@@ -214,6 +215,19 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("hitChankeyMC",&fHitChankeyMC);
     }
 
+    if(TankRecoDigitInfo_fill){
+      fPhaseIITrigTree->Branch("recoDigitfilter",&fIsFiltered);
+      fPhaseIITrigTree->Branch("recoDigitX",&fRecoDigitX);
+      fPhaseIITrigTree->Branch("recoDigitY",&fRecoDigitY);
+      fPhaseIITrigTree->Branch("recoDigitZ",&fRecoDigitZ);
+      fPhaseIITrigTree->Branch("recoDigitT",&fRecoDigitT);
+      fPhaseIITrigTree->Branch("recoDigitQ",&fRecoDigitQ);
+      fPhaseIITrigTree->Branch("recoDigitPE",&fRecoDigitPE);
+      fPhaseIITrigTree->Branch("recoDigitType", &fRecoDigitType);
+      fPhaseIITrigTree->Branch("recoDigitDetID", &fRecoDigitDetID);
+    }
+
+
     if(MRDHitInfo_fill){
       fPhaseIITrigTree->Branch("MRDhitT",&fMRDHitT);
       fPhaseIITrigTree->Branch("MRDhitDetID", &fMRDHitDetID);
@@ -363,6 +377,8 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("deltaAzimuth",&fDeltaAzimuth,"deltaAzimuth/D");
       fPhaseIITrigTree->Branch("deltaZenith",&fDeltaZenith,"deltaZenith/D");
       fPhaseIITrigTree->Branch("deltaAngle",&fDeltaAngle,"deltaAngle/D");
+      gr_deltaRvAngle = new TGraph();
+      //fPhaseIITrigTree->Branch("deltaRvAngle",&gr_deltaRvAngle, "deltaVtxR/Zenith");
     } 
   }
   return true;
@@ -740,6 +756,12 @@ bool PhaseIITreeMaker::Execute(){
     if(TankHitInfo_fill){
       this->LoadAllTankHits(isData);
     }
+    // Read RecoDigits and load into ntuple
+    // Should use RecoDigits instead of hits
+    if(TankRecoDigitInfo_fill){
+      this->LoadAllTankRecoDigits();
+    }
+
     if(SiPMPulseInfo_fill) this->LoadSiPMHits();
  
     if(MRDHitInfo_fill) this->LoadAllMRDHits(isData);
@@ -760,6 +782,8 @@ bool PhaseIITreeMaker::Execute(){
 
     bool gotmctruth = false;
     if(MCTruth_fill)  gotmctruth = this->FillMCTruthInfo();
+    
+    cout<<"getreco, getmc = "<<got_reco<<", "<<gotmctruth<<endl;
 
     if (muonTruthRecoDiff_fill) this->FillTruthRecoDiffInfo(gotmctruth,got_reco);
     if (got_reco && gotmctruth && (verbosity>4)) this->RecoSummary();
@@ -957,6 +981,18 @@ void PhaseIITreeMaker::ResetVariables() {
     fHitChankeyMC.clear();
   }
   
+  if(TankRecoDigitInfo_fill){
+    fRecoDigitIsFiltered.clear();
+    fRecoDigitX.clear();
+    fRecoDigitY.clear();
+    fRecoDigitZ.clear();
+    fRecoDigitT.clear();
+    fRecoDigitQ.clear();
+    fRecoDigitPE.clear();
+    fRecoDigitType.clear();
+    fRecoDigitDetID.clear();
+  }
+
   if (muonTruthRecoDiff_fill){ 
     fDeltaVtxX = -9999;
     fDeltaVtxY = -9999;
@@ -1354,6 +1390,26 @@ void PhaseIITreeMaker::LoadAllTankHits(bool IsData) {
   return;
 }
 
+void PhaseIITreeMaker::LoadAllTankRecoDigits() {
+  std::vector<RecoDigit>* digitList = nullptr;
+  auto get_digits = m_data->Stores.at("RecoEvent")->Get("RecoDigit",digitList);  ///> Get digits from "RecoEvent" 
+  if(!get_digits) {
+    Log("PhaseITreeMaker tool: no digit list in store!", v_error, verbosity);	
+  }
+  else {
+    fNRecoDigits = digitList->size();
+    for( auto& digit : *digitList ){
+      fRecoDigitX.push_back(digit.GetPosition().X());
+      fRecoDigitY.push_back(digit.GetPosition().Y());
+      fRecoDigitZ.push_back(digit.GetPosition().Z());
+      fRecoDigitT.push_back(digit.GetCalTime());      
+      fRecoDigitQ.push_back(digit.GetCalCharge());
+      fRecoDigitType.push_back(digit.GetDigitType());
+      fRecoDigitDetID.push_back(digit.GetDetectorID());
+    }	
+  }
+}
+
 bool PhaseIITreeMaker::FillTankRecoInfo() {
   bool got_reco_info = true;
   auto* reco_event = m_data->Stores["RecoEvent"];
@@ -1668,6 +1724,9 @@ void PhaseIITreeMaker::FillTruthRecoDiffInfo(bool successful_mcload,bool success
     double phi = TMath::ACos(cosphi); // radians
     double TheAngle = phi/(TMath::Pi()/180.0); // radians->degrees
     fDeltaAngle = TheAngle;
+    if(fDeltaVtxR>-2000 &&fDeltaVtxR<2000){
+      gr_deltaRvAngle->SetPoint(fEventNumber, fDeltaVtxR, fRecoPhi/(TMath::Pi()/180.0));
+    }
   }
 }
 

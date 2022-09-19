@@ -553,6 +553,7 @@ bool LoadWCSim::Execute(){
 			//WCSimRootChernkovDigiHit has methods GetTubeId(), GetT(), GetQ(), GetPhotonIds()
 			if(verbosity>2) cout<<"next digihit at "<<digihit<<endl;
 			int tubeid = digihit->GetTubeId();  // geometry TubeID->channelkey map is made INCLUDING offset of 1
+			if(verbosity>2) cout<<"tubeid="<<tubeid<<endl;
 			if(pmt_tubeid_to_channelkey.count(tubeid)==0){
 				cerr<<"LoadWCSim ERROR: tank PMT with no associated ChannelKey!"<<endl;
 				return false;
@@ -843,6 +844,7 @@ bool LoadWCSim::Execute(){
 	if(verbosity>1) cout<<"done loading event"<<endl;
 	
 	EventNumber++;
+	MCTriggernum++;
 	if(verbosity>2) cout<<"checking if we're done on trigs in this event"<<endl;
 	bool newentry=false;
 	if(MCTriggernum==WCSimEntry->wcsimrootevent->GetNumberOfEvents()){
