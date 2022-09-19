@@ -18,6 +18,7 @@ bool LoadANNIEEvent::Initialise(std::string config_filename, DataModel &data) {
   m_variables.Get("verbose", verbosity_);
   m_variables.Get("EventOffset", offset_evnum);
   m_variables.Get("GlobalEvNr",global_evnr);
+  m_variables.Get("MaxEventsToRead",MaxEventsToRead);//Gian
 
   global_ev = offset_evnum;
 
@@ -48,12 +49,7 @@ bool LoadANNIEEvent::Initialise(std::string config_filename, DataModel &data) {
   m_data->CStore.Set("UserEvent",false);
 
   current_entry_ += offset_evnum;
-  if (offset_evnum != 0)  {
-    m_data->CStore.Set("UserEvent",true);
-    m_data->CStore.Set("LoadEvNr",offset_evnum);
-  }
-
-
+ 
   return true;
 }
 
@@ -151,6 +147,10 @@ bool LoadANNIEEvent::Execute() {
   m_data->Stores["ANNIEEvent"]->GetEntry(current_entry_);  
   ++current_entry_;
  
+  //Gian
+  if(current_entry_ >= MaxEventsToRead)
+  m_data->vars.Set("StopLoop",1);
+
   if (global_evnr) m_data->Stores["ANNIEEvent"]->Set("EventNumber",global_ev);
   global_ev++; 
 

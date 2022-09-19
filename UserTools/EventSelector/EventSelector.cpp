@@ -15,6 +15,7 @@ bool EventSelector::Initialise(std::string configfile, DataModel &data){
   fPMTMRDOffset = false;
   fIsMC = true;
   fPMTMRDOffset = 745;
+  fRecoPDG = -1;
 
   //Get the tool configuration variables
   m_variables.Get("verbosity",verbosity);
@@ -37,6 +38,7 @@ bool EventSelector::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("RecoFVCut", fRecoFVCut);
   m_variables.Get("RecoPMTVolCut", fRecoPMTVolCut);
   m_variables.Get("PMTMRDCoincCut",fPMTMRDCoincCut);
+  m_variables.Get("PMTPosCut",fPMTPosCut);
   m_variables.Get("PMTMRDOffset",fPMTMRDOffset);
   m_variables.Get("NoVeto",fNoVetoCut);
   m_variables.Get("Veto",fVetoCut);
@@ -44,6 +46,7 @@ bool EventSelector::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("TriggerWord",fTriggerWord);
   m_variables.Get("SaveStatusToStore", fSaveStatusToStore);
   m_variables.Get("IsMC",fIsMC);
+  m_variables.Get("RecoPDG",fRecoPDG);
 
   if (!fIsMC){fMCFVCut = false; fMCPMTVolCut = false; fMCMRDCut = false; fMCPiKCut = false; fMCIsMuonCut = false; fMCIsElectronCut = false; fMCIsSingleRingCut = false; fMCIsMultiRingCut = false; fMCProjectedMRDHit = false; fMCEnergyCut = false; fPromptTrigOnly = false;}
 
@@ -100,7 +103,7 @@ bool EventSelector::Execute(){
   // Retrive digits from RecoEvent
   auto has_reco = m_data->Stores.at("RecoEvent")->Get("RecoDigit",fDigitList);  ///> Get digits from "RecoEvent" 
   if(not has_reco){
-  	Log("EventSelector  Tool: Error retrieving RecoDigits,no digit from the RecoEvent!",v_error,verbosity); 
+  	Log("EventSelector  Tool: Error retrieving RecoDigits,no digit from the RecoEvent!",v_warning,verbosity); 
   	/*return false;*/
   }
 
@@ -186,6 +189,10 @@ bool EventSelector::Execute(){
     m_data->Stores.at("RecoEvent")->Set("NHitCut",HasEnoughHits);  
   }
 
+  bool passPMTPosCut = true;
+  //bool passPMTPosCut = this->EventSelectionByPMTPos();
+  m_data->Stores.at("RecoEvent")->Set("PMTPos",passPMTPosCut);
+
   bool passPMTMRDCoincCut = this->EventSelectionByPMTMRDCoinc();
   m_data->Stores.at("RecoEvent")->Set("PMTMRDCoinc",passPMTMRDCoincCut);
 
@@ -198,6 +205,11 @@ bool EventSelector::Execute(){
   //bool passThroughGoingCut = this->EventSelectionByThroughGoing();
   bool passThroughGoingCut = true;
   m_data->Stores.at("RecoEvent")->Set("ThroughGoing",passThroughGoingCut);
+
+  std::vector<double> cluster_reco_pdg;
+  bool passRecoPDGCut = this->EventSelectionByRecoPDG(fRecoPDG, cluster_reco_pdg);
+  m_data->Stores.at("RecoEvent")->Set("RecoPDGVector",cluster_reco_pdg);
+  m_data->Stores.at("RecoEvent")->Set("PDG",fRecoPDG);
 
   // Fill the EventSelection mask for the cuts that are supposed to be applied
   if (fMCPiKCut){
@@ -292,6 +304,13 @@ bool EventSelector::Execute(){
   }
 
   //Fast check whether the times of MRD and PMT clusters are coincident
+
+
+  if(fPMTPosCut){
+    fEventApplied |= EventSelector::kFlagPMTPos;
+    if (!passPMTPosCut) fEventFlagged |= EventSelector::kFlagPMTPos;
+  }
+
   if(fPMTMRDCoincCut){
     fEventApplied |= EventSelector::kFlagPMTMRDCoinc;
     if (!passPMTMRDCoincCut) fEventFlagged |= EventSelector::kFlagPMTMRDCoinc;
@@ -316,6 +335,11 @@ bool EventSelector::Execute(){
     fEventApplied |= EventSelector::kFlagTrigger;
     if (!passTriggerCut) fEventFlagged |= EventSelector::kFlagTrigger;
   }
+
+  if (fRecoPDG != -1){
+    fEventApplied |= EventSelector::kFlagRecoPDG;
+    if (!passRecoPDGCut) fEventFlagged |= EventSelector::kFlagRecoPDG;
+  }
   
   if(fEventFlagged != EventSelector::kFlagNone) fEventCutStatus = false;
   if(fEventCutStatus){  
@@ -324,7 +348,7 @@ bool EventSelector::Execute(){
   if(fSaveStatusToStore) m_data->Stores.at("RecoEvent")->Set("EventCutStatus", fEventCutStatus);
   m_data->Stores.at("RecoEvent")->Set("EventFlagApplied", fEventApplied);
   m_data->Stores.at("RecoEvent")->Set("EventFlagged", fEventFlagged);
-  std::cout <<"EventCutStatus: "<<fEventCutStatus<<std::endl;
+  if (verbosity > 1) std::cout <<"EventCutStatus: "<<fEventCutStatus<<std::endl;
 
   return true;
 }
@@ -576,6 +600,9 @@ bool EventSelector::EventSelectionByMCProjectedMRDHit() {
 
 bool EventSelector::EventSelectionByPMTMRDCoinc() {
 
+  
+  std::vector<double> temp_bary{0.,0.,0.};
+
   if (fIsMC){
     bool has_clustered_pmt = m_data->CStore.Get("ClusterMapMC",m_all_clusters_MC);
     if (not has_clustered_pmt) { Log("EventSelector Tool: Error retrieving ClusterMapMC from CStore, did you run ClusterFinder beforehand?",v_error,verbosity); return false; }
@@ -603,7 +630,7 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
   m_data->Stores["RecoEvent"]->Set("PMTClustersTime",vec_pmtclusters_time,false);
   vec_mrdclusters_time->clear();
   m_data->Stores["RecoEvent"]->Set("MRDClustersTime",vec_mrdclusters_time);
-  std::cout <<"pmt_cluster_size: "<<pmt_cluster_size<<", mrd cluster size: "<<MrdTimeClusters.size()<<std::endl;
+  if (verbosity > 1) std::cout <<"pmt_cluster_size: "<<pmt_cluster_size<<", mrd cluster size: "<<MrdTimeClusters.size()<<std::endl;
 
   bool prompt_cluster = false;
   pmt_time = 0;
@@ -647,8 +674,29 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
           int tube = Hits.at(i_hit).GetTubeId();
           double charge_pe = Hits.at(i_hit).GetCharge()/ChannelNumToTankPMTSPEChargeMap->at(tube);
           charge_temp+=charge_pe;
+
+              //Creating Bary cluster
+	      Detector* thistube = fGeometry->ChannelToDetector(tube);
+    	      Position position_PMT = thistube->GetDetectorPosition();
+
+	      double pmt_pos_x = position_PMT.X();
+	      double pmt_pos_y = position_PMT.Y();
+	      double pmt_pos_z = position_PMT.Z();
+
+		temp_bary.at(0) += (charge_pe*pmt_pos_x);
+		temp_bary.at(1) += (charge_pe*pmt_pos_y);
+		temp_bary.at(2) += (charge_pe*pmt_pos_z);
         }
-        if (Hits.size()>0) time_temp/=Hits.size();
+
+        if (Hits.size()>0){
+	 time_temp/=Hits.size();
+
+	 //Creating Bary cluster
+	 temp_bary.at(0)/=charge_temp;
+	 temp_bary.at(1)/=charge_temp;  
+	 temp_bary.at(2)/=charge_temp;
+	 }
+
         vec_pmtclusters_charge->push_back(charge_temp);
         vec_pmtclusters_time->push_back(time_temp);
         if (time_temp > 2000.) continue;	//not a prompt event
@@ -657,19 +705,23 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
           prompt_cluster = true;
           pmt_time = time_temp;
           n_hits = int(Hits.size());
+	  cluster_bary = temp_bary;
+
         }
       }
     }
   }
 
-  std::cout <<"Maximum charge in PMT cluster: "<<max_charge<<std::endl;
-  std::cout <<"Number of PMT hits in muon cluster: "<<n_hits<<std::endl;
+  if (verbosity > 1) {
+    std::cout <<"Maximum charge in PMT cluster: "<<max_charge<<std::endl;
+    std::cout <<"Number of PMT hits in muon cluster: "<<n_hits<<std::endl;
+  }
 
   m_data->Stores["RecoEvent"]->Set("PMTClustersCharge",vec_pmtclusters_charge,false);
   m_data->Stores["RecoEvent"]->Set("PMTClustersTime",vec_pmtclusters_time,false);
 
   std::vector<double> mrd_meantimes;
-  std::cout <<"MrdTimeClusters.size(): "<<MrdTimeClusters.size()<<std::endl;
+  if (verbosity > 1) std::cout <<"MrdTimeClusters.size(): "<<MrdTimeClusters.size()<<std::endl;
   for(unsigned int thiscluster=0; thiscluster<MrdTimeClusters.size(); thiscluster++){
  
     std::vector<int> hitmrd_times;
@@ -690,7 +742,7 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
     if (hitmrd_times.size()>0) mrd_meantime /= hitmrd_times.size();
     mrd_meantimes.push_back(mrd_meantime);
   }
-  std::cout <<"mrd_meantimes.size(): "<<mrd_meantimes.size()<<std::endl;
+  if (verbosity > 1) std::cout <<"mrd_meantimes.size(): "<<mrd_meantimes.size()<<std::endl;
 
   vec_mrdclusters_time->clear();
   for (int i=0; i<(int)mrd_meantimes.size(); i++){
@@ -712,7 +764,7 @@ bool EventSelector::EventSelectionByPMTMRDCoinc() {
     double time_diff = mrd_meantimes.at(i_mrd) - pmt_time;
     if (verbosity > 0) std::cout <<"MRD time: "<<mrd_meantimes.at(i_mrd)<<", PMT time: "<<pmt_time<<", difference: "<<time_diff<<std::endl;
     Log("EventSelector tool: MRD/Tank coincidene candidate "+std::to_string(i_mrd)+ " has time difference: "+std::to_string(time_diff),v_message,verbosity);
-    std::cout <<"max_charge: "<<max_charge<<", n_hits: "<<n_hits<<std::endl;
+    if (verbosity > 1) std::cout <<"max_charge: "<<max_charge<<", n_hits: "<<n_hits<<std::endl;
     if (time_diff > pmtmrd_coinc_min && time_diff < pmtmrd_coinc_max && max_charge > 200 && n_hits >= 20){
       coincidence = true;
     }
@@ -865,7 +917,7 @@ bool EventSelector::EventSelectionByThroughGoing(){
                         }
 			for (int i_fmv=0; i_fmv < (int) fmv_hit_chkey.size(); i_fmv++){
                                 unsigned long chkey = fmv_hit_chkey.at(i_fmv);
-                                std::cout <<"chkey: "<<chkey<<std::endl;
+                                if (verbosity > 2) std::cout <<"chkey: "<<chkey<<std::endl;
                                 if (chkey <= 12){
                                 if (chkey == hit_chankey_layer1){
 					coincident_layer1=true;
@@ -890,16 +942,177 @@ bool EventSelector::EventSelectionByThroughGoing(){
 		}
 	}
 
-	std::cout <<"EventSelector tool: Through-going: "<<throughgoing<<std::endl;
+	if (verbosity > 1) std::cout <<"EventSelector tool: Through-going: "<<throughgoing<<std::endl;
 
 	return throughgoing;
 }
+
+bool EventSelector::EventSelectionByPMTPos(){
+
+	//Only implemented for Data
+
+ 	bool overlapped_MRD = false;
+
+  	Position detector_center=fGeometry->GetTankCentre();
+  	tank_center_x = detector_center.X();
+  	tank_center_y = detector_center.Y();
+  	tank_center_z = detector_center.Z();
+
+	double cluster_pos_x = cluster_bary.at(0) - tank_center_x;
+	double cluster_pos_y = cluster_bary.at(1) - tank_center_y;
+	double cluster_pos_z = cluster_bary.at(2) - tank_center_z;
+
+  	double tank_radius = fGeometry->GetTankRadius();
+  	double tank_height = fGeometry->GetTankHalfheight();
+
+	tank_radius=1.37504;
+	tank_height = 1.2833;
+
+      	double x[1];
+      	double y[1];
+        double size_top_drawing=0.1;
+
+	//location of the bary cluster
+	//extracted from EventDisplay.cpp
+        double phi;
+        if (cluster_pos_x>0 && cluster_pos_z>0 && atan(cluster_pos_z/cluster_pos_x) > TMath::Pi()/3 && fabs(cluster_pos_y) < tank_height/3){
+	phi = atan(cluster_pos_z/cluster_pos_x)+TMath::Pi()/2;
+	overlapped_MRD = true;
+	}
+        else if (cluster_pos_x<0 && cluster_pos_z>0 && atan(-cluster_pos_x/cluster_pos_z)< TMath::Pi()/6 && fabs(cluster_pos_y) < tank_height/3){
+
+	 phi = TMath::Pi()+atan(-cluster_pos_x/cluster_pos_z);
+	 overlapped_MRD = true;
+	}
+        else if (cluster_pos_x>0 && cluster_pos_z<0) phi = atan(cluster_pos_x/-cluster_pos_z);
+        else if (cluster_pos_x<0 && cluster_pos_z<0) phi = 3*TMath::Pi()/2+atan(cluster_pos_z/cluster_pos_x);
+        else phi = 0.;
+        if (phi>2*TMath::Pi()) phi-=(2*TMath::Pi());
+        phi-=TMath::Pi();
+        if (phi < - TMath::Pi()) phi = -TMath::Pi();
+        if (phi<-TMath::Pi() || phi>TMath::Pi());  //Log("EventDisplay tool: Drawing Event: Phi out of bounds! X= "+std::to_string(cluster_pos_x)+", y="+std::to_string(cluster_pos_y)+", z="+std::to_string(cluster_pos_z),v_warning,verbose);
+
+        x[0]=0.5+phi*size_top_drawing;
+        y[0]=0.5+cluster_pos_y/tank_height*tank_height/tank_radius*size_top_drawing;
+
+  return overlapped_MRD;
+
+}
+
+//Possible addition 
+/*
+	bool throughgoing = false;
+        double z0 = 0.;
+        double z1 = 0.0508;
+        double z2 = 0.0728;
+        std::vector<double> fmv_firstlayer_y{-1.987,-1.68,-1.373,-1.066,-0.758999,-0.451999,-0.144999,0.162001,0.469001,0.77601,1.083,1.39,1.697};
+
+	bool passVetoCut;
+	m_data->Stores.at("RecoEvent")->Get("NoVeto",passVetoCut);
+
+	std::vector<double> *vec_mrdclusters_time;
+	m_data->Stores["RecoEvent"]->Get("MRDClustersTime",vec_mrdclusters_time);
+
+	std::vector<unsigned long> fmv_hit_chkey;
+	std::vector<double> fmv_hit_t;
+
+
+	if (get_mrd){
+		if(TDCData){
+			if (TDCData->size()==0){
+      				Log("EventSelector tool: TDC data is empty in this event.",v_message,verbosity);
+    			} else {
+      				for (auto&& anmrdpmt : (*TDCData)){
+        				unsigned long chankey = anmrdpmt.first;
+        				Detector* thedetector = fGeometry->ChannelToDetector(chankey);
+        				unsigned long detkey = thedetector->GetDetectorID();
+        				if (thedetector->GetDetectorElement()=="Veto") {
+          					std::vector<Hit> fmv_hits = anmrdpmt.second;
+						for (int i_hit=0; i_hit < (int) fmv_hits.size(); i_hit++){
+							Hit afmvhit = fmv_hits.at(i_hit);
+							fmv_hit_chkey.push_back(chankey);
+							fmv_hit_t.push_back(afmvhit.GetTime());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (!passVetoCut && n_hits > 70){	// Need coincident veto hit for through-going candidates
+		std::vector<BoostStore>* theMrdTracks;   // the reconstructed tracks
+		int numtracksinev;
+  		m_data->Stores["MRDTracks"]->Get("MRDTracks",theMrdTracks);
+  		m_data->Stores["MRDTracks"]->Get("NumMrdTracks",numtracksinev);
+		if (numtracksinev == 1){
+			Position StartVertex;
+			Position StopVertex;
+			BoostStore* thisTrackAsBoostStore = &(theMrdTracks->at(0));
+    			thisTrackAsBoostStore->Get("StartVertex",StartVertex);
+    			thisTrackAsBoostStore->Get("StopVertex",StopVertex);
+			double mrd_start_x = StartVertex.X();
+			double mrd_start_y = StartVertex.Y();
+			double mrd_start_z = StartVertex.Z();
+			double mrd_stop_x = StopVertex.X();
+			double mrd_stop_y = StopVertex.Y();
+			double mrd_stop_z = StopVertex.Z();
+			
+			//Find intersection of extrapolated MRD track with FMV
+			double x_layer1, y_layer1, x_layer2, y_layer2;
+			std::vector<double> mrd_start{mrd_start_x,mrd_start_y,mrd_start_z};
+			std::vector<double> mrd_stop{mrd_stop_x,mrd_stop_y,mrd_stop_z};
+			FindPaddleIntersection(mrd_start,mrd_stop,x_layer1,y_layer1,z1);
+			FindPaddleIntersection(mrd_start,mrd_stop,x_layer2,y_layer2,z2);
+			unsigned long hit_chankey_layer1 = 999999;
+                        unsigned long hit_chankey_layer2 = 999999;
+                        FindPaddleChankey(x_layer1, y_layer1, 1, hit_chankey_layer1);
+                        FindPaddleChankey(x_layer2, y_layer2, 2, hit_chankey_layer2);
+
+                        bool coincident_layer1=false;
+                        bool coincident_layer2=false;
+                        if (hit_chankey_layer1 == 999999){
+                                std::cout <<"Did not find paddle with the desired intersection properties for FMV layer 1."<<std::endl;
+                        }
+                        if (hit_chankey_layer2 == 999999){
+                                std::cout << "Did not find paddle with the desired intersection properties for FMV layer 2."<<std::endl;
+                        }
+			for (int i_fmv=0; i_fmv < (int) fmv_hit_chkey.size(); i_fmv++){
+                                unsigned long chkey = fmv_hit_chkey.at(i_fmv);
+                                if (verbosity > 2) std::cout <<"chkey: "<<chkey<<std::endl;
+                                if (chkey <= 12){
+                                if (chkey == hit_chankey_layer1){
+					coincident_layer1=true;
+				} else if (y_layer1-fmv_firstlayer_y.at(chkey) > -0.4 &&
+                                        y_layer1-fmv_firstlayer_y.at(chkey)< 0.6 &&
+                                        fabs(x_layer1)<1.6) {
+						coincident_layer1 = true;
+					}
+				} else if (chkey > 12){
+					if (chkey == hit_chankey_layer2){
+						coincident_layer2=true;
+					} else if (y_layer2-fmv_firstlayer_y.at(chkey-13) > -0.4 &&
+                                        y_layer2-fmv_firstlayer_y.at(chkey-13)< 0.6 &&
+                                        fabs(x_layer1)<1.6) {
+						coincident_layer2=true;
+                                        }
+                                }
+			}
+
+			if (coincident_layer1 || coincident_layer2) throughgoing = true;
+
+		}
+	}
+
+	if (verbosity > 1) std::cout <<"EventSelector tool: Through-going: "<<throughgoing<<std::endl;
+
+	return throughgoing;
+*/
 
 bool EventSelector::EventSelectionByTrigger(int current_trigger, int reference_trigger){
 
   bool correct_triggerword = false;
   if (reference_trigger == current_trigger) correct_triggerword = true;
-  std::cout <<"current_trigger: "<<current_trigger<<", reference trigger: "<<reference_trigger<<", correct_trigger: "<<correct_triggerword<<std::endl;
+  if (verbosity > 1) std::cout <<"current_trigger: "<<current_trigger<<", reference trigger: "<<reference_trigger<<", correct_trigger: "<<correct_triggerword<<std::endl;
   return correct_triggerword;
 
 }
@@ -952,3 +1165,77 @@ bool EventSelector::FindPaddleChankey(double x, double y, int layer, unsigned lo
         }
         return found_chankey;
 }
+
+bool EventSelector::EventSelectionByRecoPDG(int recoPDG, std::vector<double> & cluster_reco_pdg){
+
+  if (fIsMC){
+    bool has_clustered_pmt = m_data->CStore.Get("ClusterMapMC",m_all_clusters_MC);
+    if (not has_clustered_pmt) { Log("EventSelector Tool: Error retrieving ClusterMapMC from CStore, did you run ClusterFinder beforehand?",v_error,verbosity); return false; }
+  } else {
+    bool has_clustered_pmt = m_data->CStore.Get("ClusterMap",m_all_clusters);
+    if (not has_clustered_pmt) { Log("EventSelector Tool: Error retrieving ClusterMap from CStore, did you run ClusterFinder beforehand?",v_error,verbosity); return false; }
+  }
+
+  std::map<double,double> ClusterMaxPEs;
+  std::map<double,Position> ClusterChargePoints;
+  std::map<double,double> ClusterChargeBalances;
+
+  bool got_ccp = m_data->Stores.at("ANNIEEvent")->Get("ClusterChargePoints", ClusterChargePoints);
+  bool got_ccb = m_data->Stores.at("ANNIEEvent")->Get("ClusterChargeBalances", ClusterChargeBalances);
+  bool got_cmpe = m_data->Stores.at("ANNIEEvent")->Get("ClusterMaxPEs", ClusterMaxPEs);
+
+  bool found_pdg = false;
+
+  if (fabs(recoPDG)==2112){
+    if (fIsMC){
+      if (m_all_clusters_MC->size()){
+        for(std::pair<double,std::vector<MCHit>>&& apair : *m_all_clusters_MC){
+          double cluster_time = apair.first;
+          double charge_balance = ClusterChargeBalances.at(cluster_time);
+          std::vector<MCHit>&MCHits = apair.second;
+          double time_temp = 0;
+          double charge_temp = 0;
+          for (unsigned int i_hit = 0; i_hit < MCHits.size(); i_hit++){
+            time_temp+=MCHits.at(i_hit).GetTime();
+            charge_temp+=MCHits.at(i_hit).GetCharge();
+          }
+          if (cluster_time > 10000 && charge_balance < 0.4 && charge_temp < 120) {
+            cluster_reco_pdg.push_back(cluster_time);
+            found_pdg = true;
+            std::cout <<"Found neutron candidate for cluster at time = "<<cluster_time<<", with CB = "<<charge_balance <<" and charge "<<charge_temp<<"!!!"<<std::endl;
+          } else {
+            std::cout <<"Did not pass neutron candidate cuts!!! Time = "<<cluster_time <<", CB = "<<charge_balance << " and charge "<<charge_temp<<"!!!"<<std::endl;
+          }
+        }
+      }
+    } else {
+      if (m_all_clusters->size()){
+        double cluster_time;
+        for(std::pair<double,std::vector<Hit>>&& apair : *m_all_clusters){
+          double cluster_time = apair.first;
+          double charge_balance = ClusterChargeBalances.at(cluster_time);
+          std::vector<Hit>&Hits = apair.second;
+          double time_temp = 0;
+          double charge_temp = 0;
+          for (unsigned int i_hit = 0; i_hit < Hits.size(); i_hit++){
+            time_temp+=Hits.at(i_hit).GetTime();
+            int tube = Hits.at(i_hit).GetTubeId();
+            double charge_pe = Hits.at(i_hit).GetCharge()/ChannelNumToTankPMTSPEChargeMap->at(tube);
+            charge_temp+=charge_pe;
+          }
+          if (cluster_time > 10000 && charge_balance < 0.4 && charge_temp < 120) {
+            cluster_reco_pdg.push_back(cluster_time);
+            found_pdg = true;
+            std::cout <<"Found neutron candidate for cluster at time = "<<cluster_time<<", with CB = "<<charge_balance <<"and charge "<<charge_temp<<"!!!"<<std::endl;
+          } else {
+            std::cout <<"Did not pass neutron candidate cuts!!! Time = "<<cluster_time <<", CB = "<<charge_balance << " and charge "<<charge_temp<<"!!!"<<std::endl;
+          }
+        }
+      }
+    }
+  }
+
+  return found_pdg;
+
+}
+

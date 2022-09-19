@@ -50,6 +50,9 @@ class EventSelector: public Tool {
    kFlagVeto        = 0x20000, //131072
    kFlagTrigger      = 0x40000,
    kFlagThroughGoing     = 0x80000,
+   kFlagPMTPos        = 0x100000,
+   kFlagRecoPDG        = 0x1000000,
+   //kFlagRecoPDG        = 0x200000,
   } EventFlags_t;
 
  private:
@@ -169,6 +172,9 @@ class EventSelector: public Tool {
   bool FindPaddleChankey(double x, double y, int layer, unsigned long &chankey);
   bool FindPaddleIntersection(std::vector<double> startpos, std::vector<double> endpos, double &x, double &y, double z);
 
+  /// \brief Event selection for reconstructed pdg values (currently just neutron)
+  //
+  bool EventSelectionByRecoPDG(int recoPDG, std::vector<double> & vector_reco_pdg);
 
   /// \brief MC entry number
   uint64_t fMCEventNum;
@@ -182,6 +188,14 @@ class EventSelector: public Tool {
   // \brief Event Status bitwords
   int fEventApplied; //Integer indicates what event cleaning flags were checked for the event
   int fEventFlagged; //Integer indicates what evt. cleaning flags the event was flagged with
+
+
+  /// \brief Event selection for FMV and tank through-going muon candidates
+  ///
+  /// This event selection criterion flags events with a through-going
+  /// muon candidate (FMV + tank)
+  bool EventSelectionByPMTPos();
+
   
   Geometry *fGeometry = nullptr;    ///< ANNIE Geometry
   RecoVertex* fMuonStartVertex = nullptr; 	 ///< true muon start vertex
@@ -199,6 +213,10 @@ class EventSelector: public Tool {
   std::vector<double> *vec_pmtclusters_time = nullptr;
   std::vector<double> *vec_mrdclusters_time = nullptr;
   std::map<int,double>* ChannelNumToTankPMTSPEChargeMap = nullptr;   ///< PMT SPE Gain Map
+
+  double tank_center_x;
+  double tank_center_y;
+  double tank_center_z;
 
   //verbosity initialization
   int verbosity=1;
@@ -230,12 +248,16 @@ class EventSelector: public Tool {
   bool fEventCutStatus;
   bool fIsMC; 
   int fTriggerWord;
+  int fRecoPDG;
+  bool fPMTPosCut = false;
 
   bool get_mrd = false;
   double pmt_time = 0; 
   double pmtmrd_coinc_min = 0; 
   double pmtmrd_coinc_max = 0;
   int n_hits = 0; 
+
+  vector <double> cluster_bary;
  
   bool fSaveStatusToStore = true;
   /// \brief verbosity levels: if 'verbosity' < this level, the message type will be logged.

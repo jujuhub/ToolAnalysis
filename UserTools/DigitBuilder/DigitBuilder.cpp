@@ -28,7 +28,7 @@ bool DigitBuilder::Initialise(std::string configfile, DataModel &data){
   fPhotodetectorConfiguration = "All";
   fParametricModel = 0;
   fIsMC = 1;
-  fDigitChargeThr = 10;
+  fDigitChargeThr = 10.;
 
 
   /// Get the Tool configuration variables
@@ -254,7 +254,7 @@ bool DigitBuilder::BuildMCPMTRecoDigit() {
             }
             double hitTime = ahit.GetTime()*1.0;
           	if(hitTime>-10 && hitTime<40) {
-			  hitTimes.push_back(ahit.GetTime()*1.0); 
+			        hitTimes.push_back(ahit.GetTime()*1.0); 
               hitCharges.push_back(ahit.GetCharge());
             }
           }
@@ -318,6 +318,7 @@ bool DigitBuilder::BuildMCLAPPDRecoDigit() {
 	double calT = 0;
 	double calQ = 0;
 	int digitType = -999;
+	TRandom3 *mit = new TRandom3();
 	Detector* det=nullptr;
 	Position  pos_sim, pos_reco;
   // repeat for LAPPD hits
@@ -372,6 +373,7 @@ bool DigitBuilder::BuildMCLAPPDRecoDigit() {
 					RecoDigit recoDigit(region, pos_reco, calT, calQ, digitType,LAPPDId);
 					//if(v_message<verbosity) recoDigit.Print();
 				  //make some cuts here. It will be moved to the Hitcleaning tool
+				  Double_t mitigation = mit->Rndm();
 				  if(calT>40 || calT<-10) continue; // cut off delayed hits
 				  fDigitList->push_back(recoDigit);
 				}

@@ -15,9 +15,12 @@ bool VtxExtendedVertexFinder::Initialise(std::string configfile, DataModel &data
   fTmin = -10.0;
   fTmax = 10.0;
   fUseTrueVertexAsSeed = false;
+  fUsePointVertexAsSeed =  false;
   fSeedGridFits = false;
   /// Get the Tool configuration variables
   m_variables.Get("UseTrueVertexAsSeed",fUseTrueVertexAsSeed);
+  m_variables.Get("UsePointVertexAsSeed",fUsePointVertexAsSeed);
+  m_variables.Get("UseMeanTimeAsSeed",fUseMeanTimeAsSeed);
   m_variables.Get("FitAllOnSeedGrid",fSeedGridFits);
   m_variables.Get("verbosity", verbosity);
   m_variables.Get("FitTimeWindowMin", fTmin);
@@ -39,10 +42,12 @@ bool VtxExtendedVertexFinder::Execute(){
   Log("VtxExtendedVertexFinder Tool: Executing",v_debug,verbosity);
   // Reset everything
   this->Reset();
+  fMeanTime = 0.0;
   
   // check if event passes the cut
   bool EventCutstatus = false;
   auto get_evtstatus = m_data->Stores.at("RecoEvent")->Get("EventCutStatus",EventCutstatus);
+  
   if(!get_evtstatus) {
     Log("Error: The PhaseITreeMaker tool could not find the Event selection status", v_error, verbosity);
     return false;	
@@ -52,7 +57,6 @@ bool VtxExtendedVertexFinder::Execute(){
   	Log("Message: This event doesn't pass the event selection. ", v_message, verbosity);
     return true;	
   }
-  
   // MC entry number
   m_data->Stores.at("ANNIEEvent")->Get("MCEventNum",fMCEventNum);  
   
@@ -61,7 +65,8 @@ bool VtxExtendedVertexFinder::Execute(){
   
   // ANNIE Event number
   m_data->Stores.at("ANNIEEvent")->Get("EventNumber",fEventNumber);
-  
+  //m_data->Stores.at("RecoEvent")->Get("meanTime", fMeanTime);
+
   std::cout<<"event number = "<<fEventNumber<<std::endl;
 	
   // Retrive digits from RecoEvent
@@ -70,64 +75,71 @@ bool VtxExtendedVertexFinder::Execute(){
     Log("VtxExtendedVertexFinder  Tool: Error retrieving RecoDigits,no digit from the RecoEvent!",v_error,verbosity); 
     return false;
   }
-	
   // Load digits to VertexGeometry
   myvtxgeo = VertexGeometry::Instance();
   myvtxgeo->LoadDigits(fDigitList);
   // Do extended vertex (muon track) reconstruction using MC truth information
   if( fUseTrueVertexAsSeed ){
-  Log("VtxExtendedVertexFinder Tool: Run vertex reconstruction using MC truth information",v_message,verbosity);
-  // get truth vertex information 
-  auto get_truevtx = m_data->Stores.at("RecoEvent")->Get("TrueVertex", fTrueVertex);
-  if(!get_truevtx){ 
-    Log("VtxExtendedVertexFinder Tool: Error retrieving TrueVertex from RecoEvent!",v_error,verbosity); 
-    return false; 
-  }
-  if(verbosity>3){
-    Position muonstartpos = fTrueVertex->GetPosition();
-    double muonstarttime = fTrueVertex->GetTime();
-    Direction muondirection = fTrueVertex->GetDirection();
-    std::cout << "VtxExtendedVertexFinder Tool: Printing muon info going into Minuit" << std::endl;
-    logmessage = "  trueVtx = (" +to_string(muonstartpos.X()) + ", " + to_string(muonstartpos.Y()) + ", " + to_string(muonstartpos.Z()) +", "+to_string(muonstarttime)+ "\n"
-              + "           " +to_string(muondirection.X()) + ", " + to_string(muondirection.Y()) + ", " + to_string(muondirection.Z()) + ") " + "\n";
-    
-    Log(logmessage,v_debug,verbosity);
-  }
-  // return vertex
-  fExtendedVertex  = (RecoVertex*)(this->FitExtendedVertex(fTrueVertex));
-  // Push fitted vertex to RecoEvent store
-  this->PushExtendedVertex(fExtendedVertex, true);
-  }
-  
+    Log("VtxExtendedVertexFinder Tool: Run vertex reconstruction using MC truth information",v_message,verbosity);
+    // get truth vertex information 
+    auto get_truevtx = m_data->Stores.at("RecoEvent")->Get("TrueVertex", fTrueVertex);
+    if(!get_truevtx){ 
+      Log("VtxExtendedVertexFinder Tool: Error retrieving TrueVertex from RecoEvent!",v_error,verbosity); 
+      return false; 
+    }
+    if(verbosity>3){
+      Position muonstartpos = fTrueVertex->GetPosition();
+      double muonstarttime = fTrueVertex->GetTime();
+      Direction muondirection = fTrueVertex->GetDirection();
+      std::cout << "VtxExtendedVertexFinder Tool: Printing muon info going into Minuit" << std::endl;
+      logmessage = "  trueVtx = (" +to_string(muonstartpos.X()) + ", " + to_string(muonstartpos.Y()) + ", " + to_string(muonstartpos.Z()) +", "+to_string(muonstarttime)+ "\n"
+                + "           " +to_string(muondirection.X()) + ", " + to_string(muondirection.Y()) + ", " + to_string(muondirection.Z()) + ") " + "\n";
+      
+      Log(logmessage,v_debug,verbosity);
+    }
+    //if(fUseMeanTimeAsSeed){
+    //  fTrueVertex->SetTime(fMeanTime);
+    //}
+    // return vertex
+    fExtendedVertex  = (RecoVertex*)(this->FitExtendedVertex(fTrueVertex));
+    // Push fitted vertex to RecoEvent store
+    this->PushExtendedVertex(fExtendedVertex, true);
+  }  
   else if(fSeedGridFits){
     Log("VtxExtendedVertexFinder Tool: Run vertex reconstruction at all grid seed positions",v_message,verbosity);
   	// Get vertex seed candidates from the store
   	std::vector<RecoVertex>* vSeedVtxList = 0;
   	auto get_seedlist = m_data->Stores.at("RecoEvent")->Get("vSeedVtxList", vSeedVtxList);
   	if(!get_seedlist){ 
-      Log("VtxPointPositionFinder Tool: Error retrieving vertex seeds from RecoEvent!",v_error,verbosity);
-      Log("VtxPointPositionFinder Tool: Needs to run VtxSeedGenerator first!",v_error,verbosity);
+      Log("VtxExtendedVertexFinder Tool: Error retrieving vertex seeds from RecoEvent!",v_error,verbosity);
+      Log("VtxExtendedVertexFinder Tool: Needs to run VtxSeedGenerator first!",v_error,verbosity);
       return false;
     }
     //Now, run FindGridSeeds.
     fExtendedVertex = (RecoVertex*)(this->FitGridSeeds(vSeedVtxList));
+    //if(fUseMeanTimeAsSeed){
+    //fExtendedVertex->SetTime(fMeanTime);
+    //}
     // Push fitted vertex to RecoEvent store
     this->PushExtendedVertex(fExtendedVertex, true);
   }
   
-  else {
+  else if (fUsePointVertexAsSeed) {
     Log("VtxExtendedVertexFinder Tool: Run extended vertex reconstruction using point vertex",v_message,verbosity);
     // get point vertex
     RecoVertex* pointvertex = 0; 
     auto get_pointvertex = m_data->Stores.at("RecoEvent")->Get("PointVertex", pointvertex);
     if(!get_pointvertex){ 
-      Log("VtxPointVertexFinder Tool: Error retrieving PointVertex from RecoEvent!",v_error,verbosity); 
+      Log("VtxExtendedVertexFinder Tool: Error retrieving PointVertex from RecoEvent!",v_error,verbosity); 
       return false; 
     }
     // return vertex
     fExtendedVertex  = (RecoVertex*)(this->FitExtendedVertex(pointvertex));
     // Push fitted vertex to RecoEvent store
     this->PushExtendedVertex(fExtendedVertex, true);    	
+  }
+  else {
+    Log("VtxExtendedVertexFinder Tool: No fit option is defined!",v_error,verbosity);	
   }
   return true;
 }
@@ -180,7 +192,7 @@ RecoVertex* VtxExtendedVertexFinder::FitGridSeeds(std::vector<RecoVertex>* vSeed
   for( unsigned int n=0; n<nlast; n++ ){
     //Find best time with Minuit
     MinuitOptimizer* myOptimizer = new MinuitOptimizer();
-    myOptimizer->SetPrintLevel(0);
+    myOptimizer->SetPrintLevel(-1);
     myOptimizer->SetMeanTimeCalculatorType(1);
     myOptimizer->LoadVertexGeometry(myvtxgeo); //Load vertex geometry
     myOptimizer->SetFitterTimeRange(fTmin, fTmax); //Set time range to fit over 

@@ -1,6 +1,6 @@
 verbose 5
 
-OutputFile BeamRun_R2584.ntuple.root
+OutputFile BeamRun_R2630.ntuple.root
 TankClusterProcessing 1
 MRDClusterProcessing 1
 TriggerProcessing 1
