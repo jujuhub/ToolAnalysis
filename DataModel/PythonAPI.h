@@ -564,7 +564,7 @@ static PyObject* SetStoreVariable(PyObject* self, PyObject* args){
   }
   PyObject* storenameasobj = PyTuple_GetSlice(args,0,0);
   if(storenameasobj){
-    std::cerr<<"PythonAPI::SetStoreVariable failed to retrieve store name from args"<<std::endl;
+    std::cerr<<"PythonAPI::SetStoreVariable failed to retrieve store name from args: " <<std::endl;
     return NULL;
   }
   PyObject* variablenameasobj = PyTuple_GetSlice(args,1,1);

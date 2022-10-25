@@ -159,3 +159,5 @@
 #include "BeamRate.h"
 #include "LoadRunInfo.h"
 #include "VtxSeedFineGrid.h"
+#include "InteractiveEvDisplay.h"
+#include "WriteTrainingCsvFiles.h"
