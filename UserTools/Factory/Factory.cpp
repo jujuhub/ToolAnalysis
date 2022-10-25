@@ -127,5 +127,7 @@ if (tool=="RunValidationStability") ret=new RunValidationStability;
 if (tool=="TimeDistributions") ret=new TimeDistributions;
 if (tool=="BeamRate") ret=new BeamRate;
 if (tool=="LoadRunInfo") ret=new LoadRunInfo;
+if (tool=="WriteTrainingCsvFiles") ret=new WriteTrainingCsvFiles;
+if (tool=="InteractiveEvDisplay") ret=new InteractiveEvDisplay;
 return ret;
 }
