@@ -1,6 +1,6 @@
 import Store  # i don't believe this causes problems as it's defined in ToolAnalysis
-#import numpy as np
-#import tensorflow as tf
+import numpy as np
+import tensorflow as tf
 
 def Initialise(pyinit):
     print("i've initialized")

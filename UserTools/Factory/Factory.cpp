@@ -120,8 +120,18 @@ if (tool=="MRDLoopbackAnalysis") ret=new MRDLoopbackAnalysis;
 if (tool=="VetoEfficiency") ret=new VetoEfficiency;
 if (tool=="MonitorTrigger") ret=new MonitorTrigger;
 
-if (tool=="EventClassification") ret=new EventClassification;
+if (tool=="LAPPDPlotWaveForms") ret=new LAPPDPlotWaveForms;
+if (tool=="LAPPDReorderData") ret=new LAPPDReorderData;
+if (tool=="LAPPDStoreReorderData") ret=new LAPPDStoreReorderData;
+if (tool=="LAPPDFindT0") ret=new LAPPDFindT0;
+if (tool=="LAPPDStoreFindT0") ret=new LAPPDStoreFindT0;
+if (tool=="LAPPDStoreReadIn") ret=new LAPPDStoreReadIn;
 
+if (tool=="ClusterDummy") ret=new ClusterDummy;
+if (tool=="LAPPDCluster") ret=new LAPPDCluster;
+if (tool=="LAPPDMakePeds") ret=new LAPPDMakePeds;
+
+if (tool=="EventClassification") ret=new EventClassification;
 if (tool=="DataSummary") ret=new DataSummary;
 if (tool=="RunValidationStability") ret=new RunValidationStability;
 if (tool=="TimeDistributions") ret=new TimeDistributions;
@@ -129,5 +139,13 @@ if (tool=="BeamRate") ret=new BeamRate;
 if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 if (tool=="WriteTrainingCsvFiles") ret=new WriteTrainingCsvFiles;
 if (tool=="InteractiveEvDisplay") ret=new InteractiveEvDisplay;
+if (tool=="LAPPDClusterTree") ret=new LAPPDClusterTree;
+if (tool=="LAPPDPlotWaveForms2D") ret=new LAPPDPlotWaveForms2D;
+if (tool=="LAPPDGausBaselineSubtraction") ret=new LAPPDGausBaselineSubtraction;
+if (tool=="LAPPDASCIIReadIn") ret=new LAPPDASCIIReadIn;
+if (tool=="BeamDecoder") ret=new BeamDecoder;
+if (tool=="LoadRunInfo") ret=new LoadRunInfo;
+if (tool=="ApplyMRDEff") ret=new ApplyMRDEff;
+if (tool=="MonitorDAQ") ret=new MonitorDAQ;
 return ret;
 }

@@ -658,7 +658,7 @@ bool PhaseIITreeMaker::Execute(){
       }
       fVetoHit = TrigHasVetoHit;
       std::vector<int> ThisClusterIndices = MrdTimeClusters.at(i);
-      for (int j=0; j < (int) ThisClusterIndices.size(); j++){
+      for (int j=0; j< (int)ThisClusterIndices.size(); j++){
         Detector *thedetector = geom->ChannelToDetector(mrddigitchankeysthisevent.at(ThisClusterIndices.at(j)));
         unsigned long detkey = thedetector->GetDetectorID();
         fMRDHitT.push_back(mrddigittimesthisevent.at(ThisClusterIndices.at(j)));
@@ -1037,7 +1037,7 @@ void PhaseIITreeMaker::LoadTankClusterHits(std::vector<Hit> cluster_hits){
   fClusterCharge = 0;
   fClusterPE = 0;
   fClusterHits = 0;
-  for (int i = 0; i<cluster_hits.size(); i++){
+  for (int i = 0; i<(int)cluster_hits.size(); i++){
     int channel_key = cluster_hits.at(i).GetTubeId();
     std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(channel_key);
     if(it != ChannelKeyToSPEMap.end()){ //Charge to SPE conversion is available
@@ -1175,6 +1175,7 @@ void PhaseIITreeMaker::LoadAllMRDHits(bool IsData){
       else chankey = it_mrd_mc->first;
       Detector* thedetector = geom->ChannelToDetector(chankey);
       unsigned long detkey = thedetector->GetDetectorID();
+/*
       std::vector<Hit> mrdhits;
       std::vector<MCHit> mrdhits_mc;
       if (IsData) mrdhits = it_mrd_data->second;
@@ -1223,6 +1224,12 @@ void PhaseIITreeMaker::LoadAllMRDHits(bool IsData){
       } else {
         it_mrd_mc++;
         if (it_mrd_mc == (*TDCData_MC).end()) loop_mrd = false;
+*/
+      if(thedetector->GetDetectorElement()=="Veto") fVetoHit=1; // this is a veto hit, not an MRD hit.
+      std::vector<Hit> mrdhits = anmrdpmt.second;
+      for(int j = 0; j<(int)mrdhits.size(); j++){
+        fMRDHitT.push_back(mrdhits.at(j).GetTime());
+        fMRDHitDetID.push_back(mrdhits.at(j).GetTubeId());
       }
     }
   }
