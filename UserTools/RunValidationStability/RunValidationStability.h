@@ -17,6 +17,7 @@
 #include "TLegend.h"
 #include "TCanvas.h"
 #include "TTree.h"
+#include "TF1.h"
 
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>

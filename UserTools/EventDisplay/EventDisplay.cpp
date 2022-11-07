@@ -41,6 +41,9 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
   histogram_config = "None";
   user_run_number = -1;
   user_run_type = 3;
+  draw_3d_fmv = true;
+  draw_3d_mrd = true;
+  summary3d = true;
 
   //--------------------------------------------
   //-------Get configuration variables----------
@@ -82,6 +85,9 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("SinglePEGains",singlePEgains);
   m_variables.Get("UseFilteredDigits",use_filtered_digits);
   m_variables.Get("ExitPointMinQ",exit_pt_min_charge);
+  m_variables.Get("Draw3DFMV",draw_3d_fmv);
+  m_variables.Get("Draw3DMRD",draw_3d_mrd);
+  m_variables.Get("Summary3D",summary3d);
 
   Log("EventDisplay tool: Initialising",v_message,verbose);
 
@@ -233,6 +239,8 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
   tank_center_x = detector_center.X();
   tank_center_y = detector_center.Y();
   tank_center_z = detector_center.Z();
+  std::cout << " [debug] tank_center: " << tank_center_x << "," << tank_center_y << "," << tank_center_z << std::endl;
+  std::cout << " [debug] tank_radius: " << tank_radius << std::endl;
 
   n_lappds = 0;
 
@@ -337,6 +345,8 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
   max_y=-100.;
   min_y=100.;
 
+  rho_wall_pmts = new TH1F("rho_wall_pmts","Distribution of rho (wall PMTs)",50,0,tank_radius);
+
   for (std::map<unsigned long,Detector*>::iterator it  = Detectors->at("Tank").begin();
                                                     it != Detectors->at("Tank").end();
                                                   ++it){
@@ -348,6 +358,14 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
     x_pmt.insert(std::pair<int,double>(detkey,position_PMT.X()-tank_center_x));
     y_pmt.insert(std::pair<int,double>(detkey,position_PMT.Y()-tank_center_y));
     z_pmt.insert(std::pair<int,double>(detkey,position_PMT.Z()-tank_center_z));
+
+    double rho = sqrt(x_pmt.at(detkey)*x_pmt.at(detkey) + z_pmt.at(detkey)*z_pmt.at(detkey));
+    if ((position_PMT.Y() > -1.75) && (position_PMT.Y() < 1.35)) 
+    {
+      std::cout << " [debug] Filling rho: " << rho << std::endl;
+      rho_wall_pmts->Fill(rho);
+    }
+
     logmessage = "EventDisplay tool: DetectorID = "+std::to_string(detkey)+", position = ("+std::to_string(position_PMT.X())+","+std::to_string(position_PMT.Y())+","+std::to_string(position_PMT.Z())+"), rho= "+std::to_string(sqrt(x_pmt.at(detkey)*x_pmt.at(detkey)+z_pmt.at(detkey)*z_pmt.at(detkey)))+", y = "+std::to_string(y_pmt.at(detkey));
     Log(logmessage,v_debug,verbose);
 
@@ -356,18 +374,51 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
 
     //ANNIE in 3D: drawing TANK PMTs
     sprintf(blockName,"tank_pmt%lu",detkey);
-    std::cout << " [debug] blockName: " << blockName << std::endl;
+    //std::cout << " [debug] blockName: " << blockName << std::endl;
     bBlock = ageom->MakeSphere(blockName, Iron, 0,1.5,0,180,0,360); //TODO:include PMT type and location condition
     bBlock->SetLineColor(41);
-    std::cout << " [debug] N (before N++): " << N << std::endl;
+    //std::cout << " [debug] N (before N++): " << N << std::endl;
     //EXPH->AddNodeOverlap(bBlock,1,new TGeoTranslation(x_pmt[detkey]*100., y_pmt[detkey]*100., z_pmt[detkey]*100.));   //these position coords work w/ tank center (0,0,0)
     EXPH->AddNodeOverlap(bBlock,detkey,new TGeoTranslation(position_PMT.X()*100., position_PMT.Y()*100., position_PMT.Z()*100.));   //these position coords work w/ tank_center_x/y/z*100.
     detkey_to_node.insert(std::pair<unsigned long, int>(detkey, N++));
-    std::cout << " [debug] N (after N++): " << N << std::endl;
-    std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
+    //std::cout << " [debug] N (after N++): " << N << std::endl;
+    //std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
     node = EXPH->GetNode(N-1);
-    std::cout << " [debug] N, node_number (N-1): " << N << "," << node->GetNumber() << std::endl;
+    //std::cout << " [debug] N, node_number (N-1): " << N << "," << node->GetNumber() << std::endl;
   }
+
+  //Get distribution of phi
+/*  for (int i_pmt=0; i_pmt<n_tank_pmts; i_pmt++){
+    unsigned long detkey = pmt_detkeys[i_pmt];
+    double x[1];
+    double y[1];
+    if (fabs(y_pmt[detkey]-max_y)<0.01) { //top pmts
+      std::cout << " just the top!" << std::endl;
+    } else if (fabs(y_pmt[detkey]-min_y)<0.01 || fabs(y_pmt[detkey]+1.30912)<0.01) { //bottom pmts
+      std::cout << " u a bottom" << std::endl;
+    } else {  //barrel
+      double phi;
+      int phi_pos = -1;
+      if (x_pmt[detkey]>0 && z_pmt[detkey]>0) { phi = atan(z_pmt[detkey]/x_pmt[detkey])+TMath::Pi()/2; phi_pos = 2; }
+      else if (x_pmt[detkey]>0 && z_pmt[detkey]<0) { phi = atan(x_pmt[detkey]/-z_pmt[detkey]); phi_pos = 3; }
+      else if (x_pmt[detkey]<0 && z_pmt[detkey]<0) { phi = 3*TMath::Pi()/2+atan(z_pmt[detkey]/x_pmt[detkey]); phi_pos = 6; }
+      else if (x_pmt[detkey]<0 && z_pmt[detkey]>0) { phi = TMath::Pi()+atan(-x_pmt[detkey]/z_pmt[detkey]); phi_pos = 7; }
+      else { phi = 0.; phi_pos = 0; }
+      if (phi>2*TMath::Pi()) phi-=(2*TMath::Pi());
+      phi-=TMath::Pi();
+      if (phi < - TMath::Pi()) phi = -TMath::Pi();
+      if (phi<-TMath::Pi() || phi>TMath::Pi())  Log("EventDisplay tool: Drawing Event: Phi out of bounds! X= "+std::to_string(x_pmt[detkey])+", y="+std::to_string(y_pmt[detkey])+", z="+std::to_string(z_pmt[detkey]),v_warning,verbose);
+      x[0]=0.5+phi*size_top_drawing;
+      y[0]=0.5+y_pmt[detkey]/tank_height*tank_height/tank_radius*size_top_drawing;
+      TPolyMarker *marker_bulk = new TPolyMarker(1,x,y,"");
+      marker_bulk->SetMarkerColor(phi_pos);
+      marker_bulk->SetMarkerStyle(8);
+      marker_bulk->SetMarkerSize(marker_size);
+      marker_pmts_phi.push_back(marker_bulk);
+    }
+  }
+*/
+
 
   logmessage = "EventDisplay tool: Properties of the detector configuration: "+std::to_string(n_veto_pmts)+" veto PMTs, "+std::to_string(n_mrd_pmts)+" MRD PMTs, "+std::to_string(n_tank_pmts)+" Tank PMTs, and "+std::to_string(n_lappds)+" LAPPDs.";
   Log(logmessage,v_message,verbose);
@@ -429,17 +480,20 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
     mrd_detkeys.push_back(detkey);
 
     //ANNIE in 3D: drawing MRD
-    Position position_MRD = mrdpaddle->GetOrigin();
-    std::cout << " [debug] position_MRD (x,y,z): " << position_MRD.X() << "," << position_MRD.Y() << "," << position_MRD.Z() << std::endl;
-    sprintf(blockName,"mrd_pmt%lu",detkey);
-    std::cout << " [debug] blockName: " << blockName << std::endl;
-    bBlock = ageom->MakeBox(blockName, Iron, (xmax-xmin)*100., (ymax-ymin)*100., (zmax-zmin)*100.); //TODO:include PMT orientation
-    bBlock->SetLineColor(16);
-    std::cout << " [debug] N (before N++): " << N << std::endl;
-    EXPH->AddNodeOverlap(bBlock,detkey,new TGeoTranslation(position_MRD.X()*100., position_MRD.Y()*100., position_MRD.Z()*100.));   //these position coords work w/ tank_center_x/y/z*100.
-    detkey_to_node.insert(std::pair<unsigned long, int>(detkey, N++));
-    std::cout << " [debug] N (after N++): " << N << std::endl;
-    std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
+    if (draw_3d_mrd)
+    {
+      Position position_MRD = mrdpaddle->GetOrigin();
+      std::cout << " [debug] position_MRD (x,y,z): " << position_MRD.X() << "," << position_MRD.Y() << "," << position_MRD.Z() << std::endl;
+      sprintf(blockName,"mrd_pmt%lu",detkey);
+      std::cout << " [debug] blockName: " << blockName << std::endl;
+      bBlock = ageom->MakeBox(blockName, Iron, (xmax-xmin)*100., (ymax-ymin)*100., (zmax-zmin)*100.); //TODO:include PMT orientation
+      bBlock->SetLineColor(16);
+      std::cout << " [debug] N (before N++): " << N << std::endl;
+      EXPH->AddNodeOverlap(bBlock,detkey,new TGeoTranslation(position_MRD.X()*100., position_MRD.Y()*100., position_MRD.Z()*100.));   //these position coords work w/ tank_center_x/y/z*100.
+      detkey_to_node.insert(std::pair<unsigned long, int>(detkey, N++));
+      std::cout << " [debug] N (after N++): " << N << std::endl;
+      std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
+    }
   }
 
   mrd_diffx = (max_mrd_x - min_mrd_x);
@@ -477,19 +531,23 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
     std::cout << " [debug] paddle x,y,z: " << vetopaddle->GetPaddleX() << "," << vetopaddle->GetPaddleY() << "," << vetopaddle->GetPaddleZ() << std::endl;   //what is this x,y,z??
 
     //ANNIE in 3D: drawing FMV
-    Position position_FMV = vetopaddle->GetOrigin();
-    std::cout << " [debug] position_FMV (x,y,z): " << position_FMV.X() << "," << position_FMV.Y() << "," << position_FMV.Z() << std::endl;
-    sprintf(blockName,"fmv_pmt%lu",detkey);
-    std::cout << " [debug] blockName: " << blockName << std::endl;
-    bBlock = ageom->MakeBox(blockName, Iron, (xmax-xmin)*100., (ymax-ymin)*100., (zmax-zmin)*100.); //TODO:include PMT orientation
-    bBlock->SetLineColor(20);
-    std::cout << " [debug] N (before N++): " << N << std::endl;
-    EXPH->AddNodeOverlap(bBlock,detkey,new TGeoTranslation(position_FMV.X()*100., position_FMV.Y()*100., position_FMV.Z()*100.));   //these position coords work w/ tank_center_x/y/z*100.
-    detkey_to_node.insert(std::pair<unsigned long, int>(detkey, N++));
-    std::cout << " [debug] N (after N++): " << N << std::endl;
-    std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
+    if (draw_3d_fmv)
+    {
+      Position position_FMV = vetopaddle->GetOrigin();
+      std::cout << " [debug] position_FMV (x,y,z): " << position_FMV.X() << "," << position_FMV.Y() << "," << position_FMV.Z() << std::endl;
+      sprintf(blockName,"fmv_pmt%lu",detkey);
+      std::cout << " [debug] blockName: " << blockName << std::endl;
+      bBlock = ageom->MakeBox(blockName, Iron, (xmax-xmin)*100., (ymax-ymin)*100., (zmax-zmin)*100.); //TODO:include PMT orientation
+      bBlock->SetLineColor(20);
+      std::cout << " [debug] N (before N++): " << N << std::endl;
+      EXPH->AddNodeOverlap(bBlock,detkey,new TGeoTranslation(position_FMV.X()*100., position_FMV.Y()*100., position_FMV.Z()*100.));   //these position coords work w/ tank_center_x/y/z*100.
+      detkey_to_node.insert(std::pair<unsigned long, int>(detkey, N++));
+      std::cout << " [debug] N (after N++): " << N << std::endl;
+      std::cout << " [debug] detkey_to_node[detkey]: " << detkey_to_node[detkey] << std::endl;
+    }
   }
   maxN = N;
+  Log("EventDisplay tool: Number of nodes in 3D geometry: "+std::to_string(maxN),v_debug,verbose);
 
   //---------------------------------------------------------------
   //---------------Read in single p.e. gains-----------------------
@@ -526,10 +584,13 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
   //---------------Initialize canvases ----------------------------
   //---------------------------------------------------------------
 
-  if (output_format == "root") {
+  if (output_format == "root" || output_format == "image") {
     std::stringstream ss_rootfile_name;
     ss_rootfile_name << out_file << ".root";
     root_file = new TFile(ss_rootfile_name.str().c_str(),"RECREATE");
+
+    root_file->cd();
+    rho_wall_pmts->Write();
   }
 
   if (draw_histograms){
@@ -538,14 +599,20 @@ bool EventDisplay::Initialise(std::string configfile, DataModel &data){
     canvas_lappd = new TCanvas("canvas_lappd","LAPPD histograms",900,600);
   }
   canvas_ev_display=new TCanvas("canvas_ev_display","Event Display",900,900);
-  canvas_3d = new TCanvas("canvas_3d","3D Event Display");
+  canvas_3d = new TCanvas("canvas_3d","3D Event Display",800,600);
+  if (summary3d)
+  {
+    canvas_3d->Divide(2,1,0.01,0);
+    //canvas_3d->cd(2);
+  }
 
-  canvas_3d->cd();
+  ageom->CloseGeometry();   //close 3d geometry
+  EXPH->SetVisibility(0);
+
+  canvas_3d->cd(1);
   EXPH->Draw();
   canvas_3d->Modified();
   canvas_3d->Update();
-  //root_file->cd();
-  //canvas_3d->Write();
 
   for (int i_lappd=0; i_lappd < max_num_lappds; i_lappd++){
     time_LAPPDs[i_lappd] = nullptr;
@@ -1667,7 +1734,12 @@ bool EventDisplay::Execute(){
   }
 
   if (save_plots){
-    if (output_format == "image") canvas_ev_display->SaveAs(filename_evdisplay.c_str());
+    if (output_format == "image") 
+    {
+      Log("EventDisplay tool: Saving canvas to image-file",v_message,verbose);
+      std::cout << " [debug] filename_evdisplay: " << filename_evdisplay << std::endl;
+      canvas_ev_display->SaveAs(filename_evdisplay.c_str());
+    }
     else {
       Log("EventDisplay tool: Saving canvas to root-file",v_message,verbose);
       root_file->cd();
@@ -1724,8 +1796,10 @@ bool EventDisplay::Finalise(){
   delete_canvas_contents();
   Log("EventDisplay tool: Clear canvas",v_debug,verbose);
   canvas_ev_display->Clear();
+  canvas_3d->Clear();
   Log("EventDisplay tool: Close canvas",v_debug,verbose);
   canvas_ev_display->Close();
+  canvas_3d->Close();
 
   Log("EventDisplay tool: Terminate & Delete TApplication",v_debug,verbose);
   if (use_tapplication) {
@@ -1740,6 +1814,7 @@ bool EventDisplay::Finalise(){
   Log("EventDisplay tool: Delete canvases",v_debug,verbose);
   
   delete canvas_ev_display;
+  delete canvas_3d;
   if (draw_histograms){
     delete canvas_pmt;
     delete canvas_pmt_supplementary;
@@ -1794,6 +1869,9 @@ void EventDisplay::make_gui(){
     box->SetLineColor(1);
     box->SetLineWidth(1);
     box->Draw();
+    for (unsigned int i_marker=0;i_marker<marker_pmts_phi.size();i_marker++){
+      marker_pmts_phi.at(i_marker)->Draw();
+    }
 
     //draw lower circle
     bottom_circle = new TEllipse(0.5,0.5-(fabs(min_y)/tank_radius+1)*size_top_drawing,size_top_drawing,size_top_drawing);
@@ -1996,6 +2074,28 @@ void EventDisplay::draw_event_box(){
     text_event_info->SetLineColor(0);
     text_event_info->Draw();
     
+    //ANNIE in 3D:summary box
+    if (summary3d)
+    {
+      canvas_3d->cd(2);
+      TPaveText *pt = new TPaveText(0.01,0.01,0.99,0.99);
+      pt->SetLineColor(1);
+      pt->AddText("ANNIE Phase II");
+      ((TText*)pt->GetListOfLines()->Last())->SetTextColor(kViolet+2);
+      pt->AddText(date_text_label.c_str());
+      pt->AddText(annie_run_label.c_str());
+      pt->AddText(annie_event_label.c_str());
+      pt->AddText(pmts_label.c_str());
+      pt->AddText(lappd_hits_label.c_str());
+      pt->AddText(trigger_text_label.c_str());
+      pt->SetTextFont(40);
+      pt->SetBorderSize(1);
+      pt->SetFillColor(0);
+      pt->SetLineWidth(0);
+      pt->SetLineColor(0);
+      pt->Draw();
+      canvas_ev_display->cd(1);
+    }
   }
 
   void EventDisplay::draw_pmt_legend(){
@@ -2169,9 +2269,8 @@ void EventDisplay::draw_event_box(){
 void EventDisplay::draw_event_PMTs(){
 
     //draw PMT event markers
+    Log("EventDisplay tool: Draw PMT event markers.",v_message,verbose);
 
-    Log("EventDisplay tool: Draw PMT event markers.",v_message,verbose)
-    ;
     //clear already existing marker vectors
     marker_pmts_top.clear();
     marker_pmts_bottom.clear();
@@ -2183,6 +2282,13 @@ void EventDisplay::draw_event_PMTs(){
     TGeoNode *node;   //TODO:move to .h file?
     TGeoTranslation *trans;
     TGeoSphere *sphere;
+
+    double cx[1] = {0.5}, cy[1] = {0.5};
+    TPolyMarker *marker_ctr = new TPolyMarker(1,cx,cy,"");
+    marker_ctr->SetMarkerColor(2);
+    marker_ctr->SetMarkerStyle(8);
+    marker_ctr->SetMarkerSize(marker_size);
+    marker_pmts_top.push_back(marker_ctr);
 
     //calculate marker coordinates
     for (int i_pmt=0;i_pmt<n_tank_pmts;i_pmt++){
@@ -2196,6 +2302,7 @@ void EventDisplay::draw_event_PMTs(){
         //draw PMTs on the top of tank
         x[0]=0.5-size_top_drawing*x_pmt[detkey]/tank_radius;
         y[0]=0.5+(max_y/tank_radius+1)*size_top_drawing-size_top_drawing*z_pmt[detkey]/tank_radius;
+        std::cout << " [debug] TOP x[0],y[0]; x_pmt,y_pmt,z_pmt; x_py, y_py: " << x[0] << "," << y[0] << "; " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << "; " << x[0]*896. << "," << 872.-y[0]*872. << "; q: " << charge[detkey] << std::endl;   //JH
         TPolyMarker *marker_top = new TPolyMarker(1,x,y,"");
         if (mode == "Charge") color_marker = Bird_Idx+int((charge[detkey]-threshold)/(maximum_pmts-threshold)*254);
         else if (mode == "Time" && threshold_time_low == -999 && threshold_time_high == -999) color_marker = Bird_Idx+int((time[detkey]-min_time_overall)/(maximum_time_overall-min_time_overall)*254);
@@ -2211,9 +2318,7 @@ void EventDisplay::draw_event_PMTs(){
         node = EXPH->GetNode(detkey_to_node[detkey]);
         node->GetVolume()->SetLineColor(color_marker);
         sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
-        sphere->SetSphDimensions(0,15.*(charge[detkey]/maximum_pmts)+5.,0,180,0,180);
-        //canvas_3d->Modified();
-        //canvas_3d->Update();
+        sphere->SetSphDimensions(0,15.*(charge[detkey]/maximum_pmts)+5.,0,180,0,360);
 
         //draw box around PMT w highest charge value [JH]
         if ((detkey == maximum_pmts_detkey) && (charge[maximum_pmts_detkey] > exit_pt_min_charge)) 
@@ -2229,8 +2334,22 @@ void EventDisplay::draw_event_PMTs(){
           bBlock->SetLineColor(2);
           EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100., (y_pmt[detkey]+tank_center_y)*100., (z_pmt[detkey]+tank_center_z)*100.));
           N++;
-          EXPH->AddNodeOverlap(bBlock,420,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100.+10., (y_pmt[detkey]+tank_center_y)*100.+10., (z_pmt[detkey]+tank_center_z)*100.+10.));
-          N++;
+
+          //add track
+          track_index = ageom->AddTrack(0,13);
+          track = ageom->GetTrack(track_index);
+          ageom->SetCurrentTrack(track);
+          track->AddPoint(tank_center_x*100.,tank_center_y*100.,tank_center_z*100.,0); //TODO:use vertex coordinates
+          track->AddPoint((x_pmt[detkey]+tank_center_x)*100.,(y_pmt[detkey]+tank_center_y)*100.,(z_pmt[detkey]+tank_center_z)*100.,0);
+          track->SetLineColor(2);
+          track->SetLineWidth(2);
+
+          //add cone
+/*          sprintf(blockName,"cherenkov_cone");
+          bBlock = ageom->MakeCone(blockName, Iron, 40,0,0,0,21);
+          bBlock->SetLineColor(9);
+          EXPH->AddNodeOverlap(bBlock,42,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100.+40., (y_pmt[detkey]+tank_center_y)*100.+40., (z_pmt[detkey]+tank_center_z)*100.+40.));
+          N++;*/
 
           //node = EXPH->GetNode(detkey_to_node[detkey]);
           //sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
@@ -2248,6 +2367,7 @@ void EventDisplay::draw_event_PMTs(){
         //draw PMTs on the bottom of tank
         x[0]=0.5-size_top_drawing*x_pmt[detkey]/tank_radius;
         y[0]=0.5-(fabs(min_y)/tank_radius+1)*size_top_drawing+size_top_drawing*z_pmt[detkey]/tank_radius;
+        std::cout << " [debug] BOTTOM x[0],y[0]; x_pmt,y_pmt,z_pmt; x_py, y_py: " << x[0] << "," << y[0] << "; " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << "; " << x[0]*896. << "," << 872.-y[0]*872. << "; q: " << charge[detkey] << std::endl;   //JH
         TPolyMarker *marker_bottom = new TPolyMarker(1,x,y,"");
         if (mode == "Charge") color_marker = Bird_Idx+int((charge[detkey]-threshold)/(maximum_pmts-threshold)*254);
         else if (mode == "Time" && threshold_time_high == -999 && threshold_time_low == -999) color_marker = Bird_Idx+int((time[detkey]-min_time_overall)/(maximum_time_overall-min_time_overall)*254); 
@@ -2263,7 +2383,7 @@ void EventDisplay::draw_event_PMTs(){
         node = EXPH->GetNode(detkey_to_node[detkey]);
         node->GetVolume()->SetLineColor(color_marker);
         sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
-        sphere->SetSphDimensions(0,15.*(charge[detkey]/maximum_pmts)+5.,0,180,0,180);
+        sphere->SetSphDimensions(0,15.*(charge[detkey]/maximum_pmts)+5.,0,180,0,360);
 
         //draw box around PMT w highest charge value [JH]
         if ((detkey == maximum_pmts_detkey) && (charge[maximum_pmts_detkey] > exit_pt_min_charge)) 
@@ -2280,18 +2400,14 @@ void EventDisplay::draw_event_PMTs(){
           EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100., (y_pmt[detkey]+tank_center_y)*100., (z_pmt[detkey]+tank_center_z)*100.));
           N++;
 
-          //node = EXPH->GetNode(detkey_to_node[detkey]);
-          //sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
-          //trans = (TGeoTranslation *)node->GetMatrix();
-          //sphere->SetSphDimensions(0,10,0,180,0,180);
-          //node->GetVolume()->SetLineColor(color_marker);
+          //add track
+          track_index = ageom->AddTrack(1,13);
+          track = ageom->GetTrack(track_index);
+          track->AddPoint(tank_center_x*100.,tank_center_y*100.,tank_center_z*100.,0); //TODO:use vertex coordinates
+          track->AddPoint((x_pmt[detkey]+tank_center_x)*100.,(y_pmt[detkey]+tank_center_y)*100.,(z_pmt[detkey]+tank_center_z)*100.,0);
+          track->SetLineColor(2);
+          track->SetLineWidth(2);
 
-          //EXPH->AddNodeOverlap(bBlock,1,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100., (y_pmt[detkey]+tank_center_y)*100., (z_pmt[detkey]+tank_center_z)*100.));
-          //EXPH->Voxelize("");
-
-          //canvas_3d->Modified();
-          //canvas_3d->Update();
-          //canvas_ev_display->cd(1);
         }
       } else {
 
@@ -2308,6 +2424,7 @@ void EventDisplay::draw_event_PMTs(){
         if (phi<-TMath::Pi() || phi>TMath::Pi())  Log("EventDisplay tool: Drawing Event: Phi out of bounds! X= "+std::to_string(x_pmt[detkey])+", y="+std::to_string(y_pmt[detkey])+", z="+std::to_string(z_pmt[detkey]),v_warning,verbose);
         x[0]=0.5+phi*size_top_drawing;
         y[0]=0.5+y_pmt[detkey]/tank_height*tank_height/tank_radius*size_top_drawing;
+        std::cout << " [debug] BARREL x[0],y[0]; x_pmt,y_pmt,z_pmt; x_py, y_py: " << x[0] << "," << y[0] << "; " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << "; " << x[0]*896. << "," << 872.-y[0]*872. << "; q: " << charge[detkey] << std::endl;   //JH
         TPolyMarker *marker_bulk = new TPolyMarker(1,x,y,"");
         if (mode == "Charge") color_marker = Bird_Idx+int((charge[detkey]-threshold)/(maximum_pmts-threshold)*254);
         else if (mode == "Time" && threshold_time_high == -999 && threshold_time_low == -999) color_marker = Bird_Idx+int((time[detkey]-min_time_overall)/(maximum_time_overall-min_time_overall)*254);
@@ -2323,7 +2440,7 @@ void EventDisplay::draw_event_PMTs(){
         node = EXPH->GetNode(detkey_to_node[detkey]);
         node->GetVolume()->SetLineColor(color_marker);
         sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
-        sphere->SetSphDimensions(0,20.*(charge[detkey]/maximum_pmts)+5.,0,180,0,180);
+        sphere->SetSphDimensions(0,20.*(charge[detkey]/maximum_pmts)+5.,0,180,0,360);
 
         //draw box around PMT w highest charge value [JH]
         if ((detkey == maximum_pmts_detkey) && (charge[maximum_pmts_detkey] > exit_pt_min_charge)) 
@@ -2340,18 +2457,14 @@ void EventDisplay::draw_event_PMTs(){
           EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100., (y_pmt[detkey]+tank_center_y)*100., (z_pmt[detkey]+tank_center_z)*100.));
           N++;
 
-          //node = EXPH->GetNode(detkey_to_node[detkey]);
-          //sphere = (TGeoSphere *)(node->GetVolume()->GetShape());
-          //trans = (TGeoTranslation *)node->GetMatrix();
-          //sphere->SetSphDimensions(0,10,0,180,0,180);
-          //node->GetVolume()->SetLineColor(4);
+          //add track
+          track_index = ageom->AddTrack(1,13);
+          track = ageom->GetTrack(track_index);
+          track->AddPoint(tank_center_x*100.,tank_center_y*100.,tank_center_z*100.,0); //TODO:use vertex coordinates
+          track->AddPoint((x_pmt[detkey]+tank_center_x)*100.,(y_pmt[detkey]+tank_center_y)*100.,(z_pmt[detkey]+tank_center_z)*100.,0);
+          track->SetLineColor(2);
+          track->SetLineWidth(2);
 
-          //EXPH->AddNodeOverlap(bBlock,1,new TGeoTranslation((x_pmt[detkey]+tank_center_x)*100., (y_pmt[detkey]+tank_center_y)*100., (z_pmt[detkey]+tank_center_z)*100.));
-          //EXPH->Voxelize("");
-
-          //canvas_3d->Modified();
-          //canvas_3d->Update();
-          //canvas_ev_display->cd(1);
         }
       }
     }
@@ -2366,7 +2479,15 @@ void EventDisplay::draw_event_PMTs(){
     for (unsigned int i_marker=0;i_marker<marker_pmts_wall.size();i_marker++){
       marker_pmts_wall.at(i_marker)->Draw();
     }
-    if (exit_pt) exit_pt->Draw();
+    if (exit_pt)
+    {
+      exit_pt->Draw();
+      canvas_3d->cd(1);
+      ageom->DrawTracks();
+      canvas_3d->Modified();
+      canvas_3d->Update();
+      canvas_ev_display->cd(1);
+    }
   }
 
   void EventDisplay::draw_event_LAPPDs(){
@@ -3033,11 +3154,18 @@ void EventDisplay::reset_3d()
     {
       node = EXPH->GetNode(maxN);
       EXPH->RemoveNode(node);
-      N--;
+      --N;
     }
   }
 
-  //canvas_3d->cd();
+  //remove tracks
+  if(ageom->GetNtracks() > 0)
+  {
+    ageom->ClearTracks();
+    if (verbose > 3) std::cout << "Clearing tracks... current number: " << ageom->GetNtracks() << std::endl;
+  }
+
+  //canvas_3d->cd(1);
   canvas_3d->Modified();
   canvas_3d->Update();
 

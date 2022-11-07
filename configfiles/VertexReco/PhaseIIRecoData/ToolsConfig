@@ -1,0 +1,21 @@
+#LoadWCSim LoadWCSim ./configfiles/VertexReco/PhaseIIRecoData/LoadWCSimConfig
+#LoadWCSimLAPPD LoadWCSimLAPPD ./configfiles/VertexReco/PhaseIIRecoData/LoadWCSimLAPPDConfig
+MCParticleProperties MCParticleProperties ./configfiles/VertexReco/PhaseIIRecoData/MCParticlePropertiesConfig
+MCRecoEventLoader MCRecoEventLoader ./configfiles/VertexReco/PhaseIIRecoData/MCRecoEventLoaderConfig
+DigitBuilder DigitBuilder ./configfiles/VertexReco/PhaseIIRecoData/DigitBuilderConfig
+HitCleaner HitCleaner ./configfiles/VertexReco/PhaseIIRecoData/HitCleanerConfig
+ClusterFinder ClusterFinder ./configfiles/VertexReco/PhaseIIRecoData/ClusterFinderConfig
+TimeClustering TimeClustering ./configfiles/VertexReco/PhaseIIRecoData/TimeClusteringConfig
+EventSelector EventSelector ./configfiles/VertexReco/PhaseIIRecoData/EventSelectorConfig
+#FindMrdTracks FindMrdTracks ./configfiles/VertexReco/PhaseIIRecoData/FindMrdT racksConfig
+VtxSeedGenerator VtxSeedGenerator ./configfiles/VertexReco/PhaseIIRecoData/VtxSeedGeneratorConfig
+#VtxPointPositionFinder VtxPointPositionFinder ./configfiles/VertexReco/PhaseIIRecoData/VtxPointPositionFinderConfig
+#VtxPointDirectionFinder VtxPointDirectionFinder ./configfiles/VertexReco/PhaseIIRecoData/VtxPointDirectionFinderConfig
+#VtxPointVertexFinder VtxPointVertexFinder ./configfiles/VertexReco/PhaseIIRecoData/VtxPointVertexFinderConfig
+VtxSeedFineGrid VtxSeedFineGrid ./configfiles/VertexReco/PhaseIIRecoData/VtxSeedFineGridConfig
+#MeanTimeCheck MeanTimeCheck ./configfiles/VertexReco/PhaseIIRecoData/MeanTimeCheckConfig
+VtxExtendedVertexFinder VtxExtendedVertexFinder ./configfiles/VertexReco/PhaseIIRecoData/VtxExtendedVertexFinderConfig
+#VtxGeometryCheck VertexGeometryCheck ./configfiles/VertexReco/PhaseIIRecoData/VertexGeometryCheckConfig
+#LikelihoodFitterCheck LikelihoodFitterCheck ./configfiles/VertexReco/PhaseIIRecoData/LikelihoodFitterCheckConfig
+PhaseIITreeMaker PhaseIITreeMaker ./configfiles/VertexReco/PhaseIIRecoData/PhaseIITreeMakerConfig
+PointSelector PythonScript ./configfiles/VertexReco/PhaseIIRecoData/PointSelectorCallerConfig

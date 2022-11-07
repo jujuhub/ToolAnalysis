@@ -38,7 +38,6 @@ bool EventSelector::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("RecoFVCut", fRecoFVCut);
   m_variables.Get("RecoPMTVolCut", fRecoPMTVolCut);
   m_variables.Get("PMTMRDCoincCut",fPMTMRDCoincCut);
-  m_variables.Get("PMTPosCut",fPMTPosCut);
   m_variables.Get("PMTMRDOffset",fPMTMRDOffset);
   m_variables.Get("NoVeto",fNoVetoCut);
   m_variables.Get("Veto",fVetoCut);
@@ -305,13 +304,6 @@ bool EventSelector::Execute(){
   }
 
   //Fast check whether the times of MRD and PMT clusters are coincident
-
-
-  if(fPMTPosCut){
-    fEventApplied |= EventSelector::kFlagPMTPos;
-    if (!passPMTPosCut) fEventFlagged |= EventSelector::kFlagPMTPos;
-  }
-
   if(fPMTMRDCoincCut){
     fEventApplied |= EventSelector::kFlagPMTMRDCoinc;
     if (!passPMTMRDCoincCut) fEventFlagged |= EventSelector::kFlagPMTMRDCoinc;

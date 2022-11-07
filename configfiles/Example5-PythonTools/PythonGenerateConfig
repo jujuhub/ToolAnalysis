@@ -1,7 +1,8 @@
 # Config file for Python Script tool
+# (updated to use changes from PR#191)
 
-PythonScript ExamplePythonGenerate
+# This config file now stores variables that may be retrieved with python
+# scripts. Access them by retrieving the corresponding variable from the
+# 'Config' store
 
-InitialiseFunction Initialise
-ExecuteFunction Execute
-FinaliseFunction Finalise
+Factor 3

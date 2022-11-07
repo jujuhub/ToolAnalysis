@@ -270,13 +270,6 @@ bool LoadANNIEEvent::Execute() {
   m_data->Stores["ANNIEEvent"]->Set("LocalEventNumber",current_entry_);
   ++current_entry_;
  
-  //Gian
-  if(current_entry_ >= MaxEventsToRead)
-  m_data->vars.Set("StopLoop",1);
-
-  if (global_evnr) m_data->Stores["ANNIEEvent"]->Set("EventNumber",global_ev);
-  global_ev++; 
-
   if ( current_entry_ >= total_entries_in_file_ ) {
     ++current_file_;
     if ( current_file_ >= input_filenames_.size() ) {
