@@ -5,7 +5,4 @@
 # scripts. Access them by retrieving the corresponding variable from the
 # 'Config' store
 
-Five 5
-a 6
-b 8.0
-c hello
+ImageFile /annie/app/users/jhe/MyToolAnalysis_Michel/EvDisplay_R2630_Qmin5_plots/EvDisplay_Run2630_Ev128.png

@@ -29,12 +29,12 @@ import pickle
 
 #-------- File with events for reconstruction:
 #--- evts for training:
-infile = "../LocalFolder/vars_Ereco.csv"
+infile = "../ToolAnalysisLink/Data_Energy_Reco/DNN_predict_output.csv"
 #--- evts for prediction:
-infile2 = "../LocalFolder/vars_Ereco.csv"
+infile2 = "../ToolAnalysisLink/Data_Energy_Reco/DNN_predict_output.csv"
 #----------------
 
-def Initialise():
+def Initialise(pyinit):
     return 1
 
 def Finalise():

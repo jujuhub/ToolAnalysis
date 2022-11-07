@@ -1,0 +1,8 @@
+## Config file for PythonScript tool
+## (updated to use changes from PR#191
+
+PythonScript PointSelector
+ConfigurationsFile configfiles/Example5-PythonTools/PointSelectorConfig
+InitialiseFunction Initialise
+ExecuteFunction Execute
+FinaliseFunction Finalise

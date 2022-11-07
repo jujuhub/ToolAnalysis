@@ -1,0 +1,8 @@
+## Config file for PythonScript tool
+## (updated to use changes from PR#191
+
+PythonScript InteractiveEvDisplay_test
+ConfigurationsFile configfiles/VertexReco/PhaseIIRecoData/PointSelectorConfig
+InitialiseFunction Initialise
+ExecuteFunction Execute
+FinaliseFunction Finalise

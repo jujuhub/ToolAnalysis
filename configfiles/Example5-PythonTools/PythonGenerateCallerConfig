@@ -1,0 +1,8 @@
+# Config file for Python Script tool
+# (updated to use changes from PR#191)
+
+PythonScript ExamplePythonGenerate
+ConfigurationsFile configfiles/Example5-PythonTools/PythonGenerateConfig
+InitialiseFunction Initialise
+ExecuteFunction Execute
+FinaliseFunction Finalise

@@ -1,0 +1,7 @@
+verbosity 5
+
+#OutputFile /Data/beamlikemu/LFCheck-beamlike8-82.root
+OutputFile ./LFCheck-1kmuons-high-0.root
+ifPlot2DFOM 1
+ShowEvent 82
+

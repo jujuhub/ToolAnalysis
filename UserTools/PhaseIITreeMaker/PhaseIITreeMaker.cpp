@@ -1175,7 +1175,6 @@ void PhaseIITreeMaker::LoadAllMRDHits(bool IsData){
       else chankey = it_mrd_mc->first;
       Detector* thedetector = geom->ChannelToDetector(chankey);
       unsigned long detkey = thedetector->GetDetectorID();
-/*
       std::vector<Hit> mrdhits;
       std::vector<MCHit> mrdhits_mc;
       if (IsData) mrdhits = it_mrd_data->second;
@@ -1224,12 +1223,6 @@ void PhaseIITreeMaker::LoadAllMRDHits(bool IsData){
       } else {
         it_mrd_mc++;
         if (it_mrd_mc == (*TDCData_MC).end()) loop_mrd = false;
-*/
-      if(thedetector->GetDetectorElement()=="Veto") fVetoHit=1; // this is a veto hit, not an MRD hit.
-      std::vector<Hit> mrdhits = anmrdpmt.second;
-      for(int j = 0; j<(int)mrdhits.size(); j++){
-        fMRDHitT.push_back(mrdhits.at(j).GetTime());
-        fMRDHitDetID.push_back(mrdhits.at(j).GetTubeId());
       }
     }
   }
