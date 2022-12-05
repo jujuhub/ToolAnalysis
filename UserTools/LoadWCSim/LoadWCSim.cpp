@@ -93,11 +93,6 @@ bool LoadWCSim::Initialise(std::string configfile, DataModel &data){
                  Log("LoadWCSim Tool: No RunType specified. Assuming RunType = 3 (Beam)",v_warning,verbosity);
                  RunType = 3;
         }
-        get_ok = m_variables.Get("PMTMask",PMTMask);
-        if (not get_ok){
-                Log("LoadWCSim Tool: Assuming to use no PMTMask",v_warning,verbosity);
-                PMTMask = "None";
-        }
 
 	MCEventNum=0;
 	get_ok = m_variables.Get("FileStartOffset",MCEventNum);
