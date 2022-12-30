@@ -155,5 +155,10 @@ if (tool=="BeamRate") ret=new BeamRate;
 if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 if (tool=="WriteTrainingCsvFiles") ret=new WriteTrainingCsvFiles;
 if (tool=="InteractiveEvDisplay") ret=new InteractiveEvDisplay;
+if (tool=="saveLAPPDInfo") ret=new saveLAPPDInfo;
+if (tool=="parseLAPPDData") ret=new parseLAPPDData;
+if (tool=="checkLAPPDStatus") ret=new checkLAPPDStatus;
+if (tool=="GetLAPPDEvents") ret=new GetLAPPDEvents;
+if (tool=="LAPPDDataDecoder") ret=new LAPPDDataDecoder;
 return ret;
 }

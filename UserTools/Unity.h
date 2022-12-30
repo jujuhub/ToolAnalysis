@@ -161,3 +161,8 @@
 #include "VtxSeedFineGrid.h"
 #include "InteractiveEvDisplay.h"
 #include "WriteTrainingCsvFiles.h"
+#include "saveLAPPDInfo.h"
+#include "parseLAPPDData.h"
+#include "checkLAPPDStatus.h"
+#include "GetLAPPDEvents.h"
+#include "LAPPDDataDecoder.h"
