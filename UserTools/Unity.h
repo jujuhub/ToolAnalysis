@@ -166,3 +166,4 @@
 #include "checkLAPPDStatus.h"
 #include "GetLAPPDEvents.h"
 #include "LAPPDDataDecoder.h"
+#include "MuonFitter.h"

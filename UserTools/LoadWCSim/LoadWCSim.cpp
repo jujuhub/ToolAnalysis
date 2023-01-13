@@ -257,6 +257,7 @@ bool LoadWCSim::Initialise(std::string configfile, DataModel &data){
 	
 	return true;
 }
+}
 
 
 bool LoadWCSim::Execute(){

@@ -75,7 +75,12 @@ bool LoadANNIEEvent::Initialise(std::string config_filename, DataModel &data) {
   m_data->CStore.Set("UserEvent",false);
 
   current_entry_ += offset_evnum;
- 
+  if (offset_evnum != 0)  {
+    m_data->CStore.Set("UserEvent",true);
+    m_data->CStore.Set("LoadEvNr",offset_evnum);
+  }
+
+
   return true;
 }
 
@@ -270,6 +275,11 @@ bool LoadANNIEEvent::Execute() {
   m_data->Stores["ANNIEEvent"]->Set("LocalEventNumber",current_entry_);
   ++current_entry_;
  
+  if (global_evnr) m_data->Stores["ANNIEEvent"]->Set("EventNumber",global_ev);
+  global_ev++; 
+
+
+
   if ( current_entry_ >= total_entries_in_file_ ) {
     ++current_file_;
     if ( current_file_ >= input_filenames_.size() ) {

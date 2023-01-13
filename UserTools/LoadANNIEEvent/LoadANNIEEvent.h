@@ -26,8 +26,6 @@ class LoadANNIEEvent: public Tool {
 
   protected:
 
-    int MaxEventsToRead; //Gian
-
     /// @brief Integer code that determines the level of logging to show in
     /// the output
     int verbosity_;
