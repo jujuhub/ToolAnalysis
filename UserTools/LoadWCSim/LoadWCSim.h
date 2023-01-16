@@ -67,7 +67,6 @@ class LoadWCSim: public Tool {
 	double LappdStripSeparation;  // [mm] for calculating relative y position of each stripline
 	std::string path_chankeymap;  // Mapping chankeys generated from WCSim to chankeys in data
 	int RunType;	
-	std::string PMTMask;	
 
 	// WCSim variables
 	//////////////////
@@ -91,7 +90,7 @@ class LoadWCSim: public Tool {
 
 	//Masked PMT IDs
 	std::vector<int> masked_ids;
-        std::string PMTMask;
+  std::string PMTMask;
 
 	// For constructing ToolChain Geometry
 	//////////////////////////////////////

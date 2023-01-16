@@ -67,6 +67,7 @@ bool LoadWCSim::Initialise(std::string configfile, DataModel &data){
 	if (not get_ok){
 		Log("LoadWCSim Tool: Assuming to use no PMTMask",v_warning,verbosity);
 		PMTMask = "None";
+  }
 	get_ok = m_variables.Get("TriggerWord",TriggerWord);
 	if (not get_ok){
 		Log("LoadWCSim Tool: No Triggerword specified. Assuming TriggerWord = 5 (Beam)",v_warning,verbosity);
@@ -256,7 +257,6 @@ bool LoadWCSim::Initialise(std::string configfile, DataModel &data){
 	triggers_event = 0;
 	
 	return true;
-}
 }
 
 
