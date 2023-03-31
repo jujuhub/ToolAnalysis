@@ -1,1 +1,2 @@
-/pnfs/annie/persistent/users/mnieslon/data/processed_hits/R2471/ProcessedRawData_TankAndMRDAndCTC_R2471S0p0
+/pnfs/annie/persistent/users/mnieslon/data/processed_hits_improved/R2630/ProcessedRawData_TankAndMRDAndCTC_R2630S0p0
+#/pnfs/annie/persistent/users/mnieslon/data/processed_hits/R2421/ProcessedRawData_TankAndMRDAndCTC_R2421S0p0

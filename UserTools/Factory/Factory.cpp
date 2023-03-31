@@ -125,5 +125,8 @@ if (tool=="EventClassification") ret=new EventClassification;
 if (tool=="DataSummary") ret=new DataSummary;
 if (tool=="uraTool") ret=new uraTool;
 if (tool=="PhaseIINeutronBG") ret=new PhaseIINeutronBG;
+if (tool=="P2RunQualityCheck") ret=new P2RunQualityCheck;
+if (tool=="BeamDecoder") ret=new BeamDecoder;
+if (tool=="LoadRunInfo") ret=new LoadRunInfo;
 return ret;
 }

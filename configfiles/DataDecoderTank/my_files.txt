@@ -1,1 +1,10 @@
-/pnfs/annie/scratch/users/pershint/RawData/RAWDataR1548S0p0
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p0
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p1
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p2
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p3
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p4
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p5
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p6
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p7
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p8
+/pnfs/annie/persistent/users/jhe/data/raw/2248/RAWDataR2248S0p9

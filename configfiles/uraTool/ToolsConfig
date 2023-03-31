@@ -1,5 +1,7 @@
-uraTool1 uraTool configfiles/uraTool/uraToolToolConfig
-myLoadGeometry LoadGeometry configfiles/uraTool/LoadGeometryConfig
-myLoadANNIEEvent LoadANNIEEvent configfiles/uraTool/LoadANNIEEventConfig
-myPrintANNIEEvent PrintANNIEEvent configfiles/uraTool/PrintANNIEEventConfig
-myPhaseIIADCCalibrator PhaseIIADCCalibrator configfiles/uraTool/PhaseIIADCCalibratorConfig
+#uraTool1 uraTool configfiles/uraTool/uraToolToolConfig
+loaddatGeometry LoadGeometry configfiles/uraTool/LoadGeometryConfig
+loaddeezANNIEEventz LoadANNIEEvent configfiles/uraTool/LoadANNIEEventConfig
+#uraTool1 uraTool configfiles/uraTool/uraToolToolConfig
+#cluster ClusterFinder configfiles/uraTool/ClusterFinderConfig
+printdemANNIEEventz PrintANNIEEvent configfiles/uraTool/PrintANNIEEventConfig
+#myPhaseIIADCCalibrator PhaseIIADCCalibrator configfiles/uraTool/PhaseIIADCCalibratorConfig # NOT needed if using processed_hits

@@ -20,6 +20,7 @@
 #include "RecoDigit.h"
 #include "ANNIEalgorithms.h"
 #include "TimeClass.h"
+#include "BeamStatus.h"
 
 class PhaseIITreeMaker: public Tool {
 
@@ -80,6 +81,8 @@ class PhaseIITreeMaker: public Tool {
   int fRunType;
   uint64_t fStartTime;
   int fNumEntries;
+  double fPot;
+  int fBeamok;	//1: beam is ok, 0: beam is not ok 
   
   
   // \brief Event Status flag masks

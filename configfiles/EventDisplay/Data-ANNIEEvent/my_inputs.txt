@@ -1,1 +1,2 @@
-/pnfs/annie/persistent/users/pershint/ProcessedData/V0/ProcessedRawData_TankMRDR1624S0
+#/pnfs/annie/persistent/users/pershint/ProcessedData/V0/ProcessedRawData_TankMRDR1624S0
+/pnfs/annie/persistent/users/lpickard/Processed_Data_Files/R2248S0p0/ProcessedRawData_TankOnly_R-1S-1

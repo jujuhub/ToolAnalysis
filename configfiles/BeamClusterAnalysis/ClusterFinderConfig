@@ -2,7 +2,7 @@
 
 Verbosity 0
 HitStore Hits #Either MCHits or Hits (accessed in ANNIEEvent store)
-OutputFile BeamRun_ClusterFinder_DefaultOutput #Output root prefix name for the current run
+OutputFile BeamRun_ClusterFinder_R2630 #Output root prefix name for the current run
 ClusterFindingWindow 50 # in ns, size of the window used to "clusterize"
 AcqTimeWindow 70000 # in ns, size of the acquisition window
 ClusterIntegrationWindow 50 # in ns, all hits with +/- 1/2 of this window are considered in the cluster

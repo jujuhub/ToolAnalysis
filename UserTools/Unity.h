@@ -129,3 +129,8 @@
 #include "MonitorTrigger.h"
 #include "EventClassification.h"
 #include "DataSummary.h"
+#include "uraTool.h"
+#include "PhaseIINeutronBG.h"
+#include "P2RunQualityCheck.h"
+#include "BeamDecoder.h"
+#include "LoadRunInfo.h"

@@ -48,10 +48,12 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
     fPhaseIITankClusterTree->Branch("subrunNumber",&fSubrunNumber,"subrunNumber/I");
     fPhaseIITankClusterTree->Branch("runType",&fRunType,"runType/I");
     fPhaseIITankClusterTree->Branch("startTime",&fStartTime,"startTime/l");
+    std::cout << "  [DEBUG] fStartTime: " << fStartTime << std::endl;
 
     //Some lower level information to save
     fPhaseIITankClusterTree->Branch("eventNumber",&fEventNumber,"eventNumber/I");
     fPhaseIITankClusterTree->Branch("eventTimeTank",&fEventTimeTank,"eventTimeTank/l");
+    std::cout << "  [DEBUG] fEventTimeTank: " << fEventTimeTank << std::endl;
     fPhaseIITankClusterTree->Branch("clusterNumber",&fClusterNumber,"clusterNumber/I");
     fPhaseIITankClusterTree->Branch("clusterTime",&fClusterTime,"clusterTime/D");
     fPhaseIITankClusterTree->Branch("clusterCharge",&fClusterCharge,"clusterCharge/D");
@@ -62,6 +64,8 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
     fPhaseIITankClusterTree->Branch("clusterChargePointZ",&fClusterChargePointZ,"clusterChargePointZ/D");
     fPhaseIITankClusterTree->Branch("clusterChargeBalance",&fClusterChargeBalance,"clusterChargeBalance/D");
     fPhaseIITankClusterTree->Branch("clusterHits",&fClusterHits,"clusterHits/i");
+    fPhaseIITankClusterTree->Branch("beam_pot",&fPot);
+    fPhaseIITankClusterTree->Branch("beam_ok",&fBeamok);
     if(TankHitInfo_fill){
       fPhaseIITankClusterTree->Branch("filter",&fIsFiltered);
       fPhaseIITankClusterTree->Branch("hitX",&fHitX);
@@ -99,6 +103,9 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
     fPhaseIIMRDClusterTree->Branch("clusterTime",&fMRDClusterTime,"clusterTime/D");
     fPhaseIIMRDClusterTree->Branch("clusterTimeSigma",&fMRDClusterTimeSigma,"clusterTimeSigma/D");
     fPhaseIIMRDClusterTree->Branch("clusterHits",&fMRDClusterHits,"clusterHits/i");
+    fPhaseIIMRDClusterTree->Branch("beam_pot",&fPot);
+    fPhaseIIMRDClusterTree->Branch("beam_ok",&fBeamok);
+
     if(MRDHitInfo_fill){
       fPhaseIIMRDClusterTree->Branch("MRDhitT",&fMRDHitT);
       fPhaseIIMRDClusterTree->Branch("MRDhitDetID", &fMRDHitDetID);
@@ -136,6 +143,9 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
     fPhaseIITrigTree->Branch("eventTimeMRD",&fEventTimeMRD,"eventTimeMRD/l");
     fPhaseIITrigTree->Branch("nhits",&fNHits,"nhits/I");
 
+    //Beam information
+    fPhaseIITrigTree->Branch("beam_pot",&fPot);
+    fPhaseIITrigTree->Branch("beam_ok",&fBeamok);
 
     //Event Staus Flag Information
     if(fillCleanEventsOnly){
@@ -326,6 +336,13 @@ bool PhaseIITreeMaker::Execute(){
       m_data->Stores.at("ANNIEEvent")->Get("SubrunNumber",fSubrunNumber);
       m_data->Stores.at("ANNIEEvent")->Get("RunType",fRunType);
       m_data->Stores.at("ANNIEEvent")->Get("RunStartTime",fStartTime);
+
+      BeamStatus beamstat;
+      m_data->Stores["ANNIEEvent"]->Get("BeamStatus",beamstat);
+      if (beamstat.ok()) fBeamok = 1;
+      else fBeamok = 0;
+      fPot = beamstat.pot();
+      std::cout << "  [DEBUG] fPot = " << fPot << std::endl;
   
       // ANNIE Event number
       m_data->Stores.at("ANNIEEvent")->Get("EventTimeTank",fEventTimeTank);
@@ -384,6 +401,12 @@ bool PhaseIITreeMaker::Execute(){
       this->ResetVariables();
       fMRDClusterHits = 0;
       fVetoHit = TrigHasVetoHit;
+      BeamStatus beamstat;
+      m_data->Stores["ANNIEEvent"]->Get("BeamStatus",beamstat);
+      if (beamstat.ok()) fBeamok = 1;
+      else fBeamok = 0;
+      fPot = beamstat.pot();
+      std::cout << "  [DEBUG] fPot = " << fPot << std::endl;
       std::vector<int> ThisClusterIndices = MrdTimeClusters.at(i);
       for(int j=0;j<ThisClusterIndices.size(); j++){
         fMRDHitT.push_back(mrddigittimesthisevent.at(ThisClusterIndices.at(j)));
@@ -424,10 +447,19 @@ bool PhaseIITreeMaker::Execute(){
     m_data->Stores.at("ANNIEEvent")->Get("SubrunNumber",fSubrunNumber);
     m_data->Stores.at("ANNIEEvent")->Get("RunType",fRunType);
     m_data->Stores.at("ANNIEEvent")->Get("RunStartTime",fStartTime);
+    std::cout << "  [DEBUG] fStartTime: " << fStartTime << std::endl;
   
     // ANNIE Event number
     m_data->Stores.at("ANNIEEvent")->Get("EventNumber",fEventNumber);
     m_data->Stores.at("ANNIEEvent")->Get("EventTimeTank",fEventTimeTank);
+    std::cout << "  [DEBUG] fEventTimeTank: " << fEventTimeTank << std::endl;
+
+    BeamStatus beamstat;
+    m_data->Stores["ANNIEEvent"]->Get("BeamStatus",beamstat);
+    if (beamstat.ok()) fBeamok = 1;
+    else fBeamok = 0;
+    fPot = beamstat.pot();
+    std::cout << "  [DEBUG] fPot = " << fPot << std::endl;
 
     bool got_mrdtime = m_data->Stores.at("ANNIEEvent")->Get("EventTime",mrd_timestamp);
     if(got_mrdtime) fEventTimeMRD = static_cast<uint64_t>(mrd_timestamp->GetNs());
@@ -484,6 +516,8 @@ void PhaseIITreeMaker::ResetVariables() {
   fNHits = -9999;
   fVetoHit = -9999;
   fEventTimeMRD = 9999;
+  fPot = -99999;
+  fBeamok = -99999;
 
   if(SiPMPulseInfo_fill){
     fSiPM1NPulses = -9999;

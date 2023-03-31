@@ -1,6 +1,6 @@
-verbosity 3
-OutputFile TransparencyRun1331_Waveforms
-UseLEDWaveforms 1
+verbosity 4
+OutputFile CheckWvfm
+UseLEDWaveforms 0
 WavesWithPulsesOnly 0
 SaveWaveforms 1 
 MaxWaveforms 20000

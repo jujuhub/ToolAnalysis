@@ -150,6 +150,7 @@ void PrintADCData::PrintInfoInData(std::map<unsigned long, std::vector<Waveform<
           for (int j = 0; j < onebuffer_pulses.size(); j++){
             ADCPulse apulse = onebuffer_pulses.at(j);
             int pulse_height = apulse.raw_amplitude() - apulse.baseline();
+            std::cout << " [debug] raw_amplitude: " << apulse.raw_amplitude() << " , baseline: " << apulse.baseline() << " , pulse_height: " << pulse_height << std::endl;
             if (pulse_height >= pulse_threshold) num_pulses +=1;
           }
       }
@@ -201,6 +202,8 @@ void PrintADCData::PrintInfoInData(std::map<unsigned long, std::vector<Waveform<
       Log("PrintADCData Tool: Looping over "+to_string(raw_waveforms.size())
            +" minibuffers",v_debug,verbosity);
       for(Waveform<uint16_t> wfrm : raw_waveforms){
+        //std::cout << " [debug] raw_waveforms.Print(): " << std::endl;
+        //raw_waveforms.Print();    //no member called Print
         std::vector<uint16_t>* samples = wfrm.GetSamples();
         double StartTime = wfrm.GetStartTime();
         int SampleLength = samples->size();

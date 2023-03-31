@@ -1,1 +1,2 @@
-ProcessedRawDataR1401S0
+/pnfs/annie/persistent/users/lpickard/Processed_Data_Files/R2248S0p0/ProcessedRawData_TankOnly_R-1S-1
+#/pnfs/annie/persistent/users/mnieslon/data/processed_hits_improved/R2630/ProcessedRawData_TankAndMRDAndCTC_R2630S0p0

@@ -1,1 +1,1 @@
-/pnfs/annie/persistent/users/pershint/ProcessedData/BeamData2019_2020/BeamRuns_FirstPass/ProcessedRawData_TankMRDR1628S0
+/annie/app/users/jhe/MyToolAnalysis_EventBuilding/R2630_maxpeak/ProcessedRawData_TankAndMRDAndCTC_R2630S0p0

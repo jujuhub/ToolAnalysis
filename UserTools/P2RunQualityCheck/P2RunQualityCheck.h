@@ -18,6 +18,7 @@
 #include "TGraph.h"
 #include "TH1D.h"
 #include "TH2D.h"
+#include "TLine.h"
 #include "TMath.h"
 #include "TROOT.h"
 #include "TSystem.h"
@@ -57,6 +58,17 @@ class P2RunQualityCheck: public Tool {
   int maxEntries;
   uint32_t globalRunNumber;
 
+  uint32_t trigword;
+  int trigext;
+  int prevpart;
+  int globalEntry;
+  int beamEntry;
+  int n_beam_evts;
+  int n_beam_pot;
+  int n_ok_evts;
+
+  std::ofstream beampot_file;
+
   Geometry *fGeo = nullptr;
 
   std::map<int, double> map_chankey2spe;
@@ -64,45 +76,30 @@ class P2RunQualityCheck: public Tool {
 	std::vector<BoostStore> *theMrdTracks; //the actual tracks
   std::map<double, std::vector<Hit>> *m_all_clusters = nullptr;
 
-  uint32_t trigword;
-  int trigext;
-  int prevpart;
-  int globalEntry_i;
-  int beam_entry_i;
-  int n_beam_evts;
-  int n_beam_pot;
-  int n_ok_evts;
-  int e;
-  int gi;
-  int pi;
-	int numsubevs;
-
-  size_t max_deq_size;
-  std::deque<double> pot_deq;
-  std::vector<std::pair<int, double> > gradient_vec;
-
   // ROOT 
   TFile *p2rqc_root_outp = nullptr;
 
+  TLine *l = nullptr;
+
   // ROOT histograms
-  int th2_xlim;
-  TH2D *h_beam_ok_all = nullptr;
-  TH2D *h_beam_pot_all = nullptr;
-  TH2D *h_beam_pot_all_zoomx = nullptr;
-  TH2D *h_beam_pot_all_zoomxy = nullptr;
-  TH2D *h_beam_ok_beam = nullptr;
-  TH2D *h_beam_pot_beam = nullptr;
-  TH2D *h_tankcharge_part = nullptr;
-  TH2D *h_tankcharge_part_zoom = nullptr;
-  TH2D *h_tankcharge_all = nullptr;
-  TH2D *h_tankcharge_all_zoom = nullptr;
-  TH1D *h_clusterTime_all = nullptr;
-  TH1D *h_clusterTime_short = nullptr;
-  TH1D *h_clusterCharge_short = nullptr;
-  TH1D *h_clusterPE_short = nullptr;
-  TH1D *h_clusterTime_long = nullptr;
-  TH1D *h_clusterCharge_long = nullptr;
-  TH1D *h_clusterPE_long = nullptr;
+  //1D
+  TH1D *h_beampot_ok_all = nullptr;
+  TH1D *h_beampot_nok_all = nullptr;
+  TH1D *h_pot_beam = nullptr;
+  TH1D *h_pot_led = nullptr;
+  TH1D *h_pot_cosmics = nullptr;
+  TH1D *h_pot_ok_beam = nullptr;
+  TH1D *h_pot_ok_led = nullptr;
+  TH1D *h_pot_ok_cosmics = nullptr;
+  TH1D *h_pot_nok_beam = nullptr;
+  TH1D *h_pot_nok_led = nullptr;
+  TH1D *h_pot_nok_cosmics = nullptr;
+
+  //2D
+  TH2D *h2_pot_all = nullptr;
+  TH2D *h2_pot_all_zoomx = nullptr;
+  TH2D *h2_pot_all_zoomxy = nullptr;
+  TH2D *h2_pot_ok_beam = nullptr;
 
   // ROOT graphs
   TCanvas *c_short_part = nullptr;
@@ -121,6 +118,9 @@ class P2RunQualityCheck: public Tool {
   int fPartNumber;
   int fVetoHit;
   std::vector<double> fHitPE;
+
+  double fBeamPOT;
+  int fBeamOK;
 
   TTree *t_cluster = nullptr;
   double fClusterCharge;
