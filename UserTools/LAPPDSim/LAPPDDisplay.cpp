@@ -18,9 +18,8 @@ _output_file_name(filePath),_config_number(confignumber)
 {
   //TApplication
 	int myargc = 0;
-	char *myargv[] =
-	{ (const char*) "somestring" };
-	_LAPPD_sim_app = new TApplication("LAPPDSimApp", &myargc, myargv);
+	const char *myargv[] = { (const char*) "somestring" };
+	_LAPPD_sim_app = new TApplication("LAPPDSimApp", &myargc, const_cast<char**>(myargv));
   //Canvases only need to be created, if one wants to display the plots while the program is running
 	if (_config_number == 2)
 	{
@@ -154,7 +153,7 @@ void LAPPDDisplay::MCTruthDrawing(int eventNumber, unsigned long actualTubeNo, v
 
     //Find the minimal time to create the histograms in a decent range
 		double mintime = 1000000;
-		for (int k = 0; k < mchits.size(); k++)
+		for (int k = 0; k < (int) mchits.size(); k++)
 		{
 			LAPPDHit ahit = mchits.at(k);
 			double atime = ahit.GetTime();
@@ -175,7 +174,7 @@ void LAPPDDisplay::MCTruthDrawing(int eventNumber, unsigned long actualTubeNo, v
 		TH2D* LAPPDPara = new TH2D(charNamePara, charNamePara, 256, mintime-1, mintime + 25.6, 60, -0.12, 0.12);
 
     //loop over all MC hits
-    for (int i = 0; i < mchits.size(); i++)
+    for (int i = 0; i < (int) mchits.size(); i++)
 		{
       //Getting the hit information
 			LAPPDHit ahit = mchits.at(i);
@@ -312,7 +311,7 @@ void LAPPDDisplay::RecoDrawing(int eventCounter, unsigned long tubeNumber, std::
     TH1D* waveformRight = new TH1D(waveformRightChar, waveformRightChar, 256, 0, 25.6);
 
     //loop over the samples
-		for (int j = 0; j < samplesleft->size(); j++)
+		for (int j = 0; j < (int) samplesleft->size(); j++)
 		{
       //The samples range from 0 to 256, which equals 0 to 25.6 ns.
       //Therefore one needs the sample number divided with 10 to get ns.

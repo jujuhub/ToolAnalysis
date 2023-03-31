@@ -7,8 +7,10 @@
 #include "Tool.h"
 #include "CardData.h"
 #include "TriggerData.h"
+#include "PsecData.h"
 #include "BoostStore.h"
 #include "Store.h"
+#include "PsecData.h"
 
 /**
  * \class LoadRawData
@@ -30,6 +32,7 @@ class LoadRawData: public Tool {
   bool Finalise(); ///< Finalise function used to clean up resources.
   void LoadPMTMRDData(); 
   void LoadTriggerData(); 
+  void LoadLAPPDData(); 
   void LoadRunInformation();
   void GetNextDataEntries();
   bool InitializeNewFile(); 
@@ -51,16 +54,24 @@ class LoadRawData: public Tool {
   bool storerawdata;
 
   int FileNum = 0;
-  int tanktotalentries;
-  int trigtotalentries;
-  int mrdtotalentries;
+  long tanktotalentries;
+  long trigtotalentries;
+  long mrdtotalentries;
+  long lappdtotalentries;
   bool TankEntriesCompleted;
   bool MRDEntriesCompleted;
   bool TrigEntriesCompleted;
+  bool LAPPDEntriesCompleted;
   bool FileCompleted;
   int TankEntryNum = 0;
   int MRDEntryNum = 0;
   int TrigEntryNum = 0;
+  int LAPPDEntryNum = 0;
+
+  //Run / Subrun / part info
+  int extract_run;
+  int extract_subrun;
+  int extract_part;
 
   //Run / Subrun / part info
   int extract_run;
@@ -71,15 +82,19 @@ class LoadRawData: public Tool {
   bool TankPaused;
   bool MRDPaused;
   bool CTCPaused;
+  bool LAPPDPaused;
 
   BoostStore *RawData = nullptr;
   BoostStore *PMTData = nullptr;
   BoostStore *MRDData = nullptr;
   BoostStore *TrigData = nullptr;
+  BoostStore *LAPPDData = nullptr;
+
   std::vector<CardData>* Cdata = nullptr;
   //std::vector<TriggerData>* Tdata = nullptr;
   TriggerData* Tdata = nullptr;
   MRDOut* Mdata = nullptr;
+  PsecData* Ldata = nullptr;
 
   int verbosity;
   int v_error=0;

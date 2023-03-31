@@ -6,12 +6,15 @@
 
 #include "Tool.h"
 
+#include "SlowControlMonitor.h"
+
 #include "boost/date_time/gregorian/gregorian.hpp"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/chrono.hpp>
 #include <boost/uuid/uuid.hpp>            // uuid class                                     
 #include <boost/uuid/uuid_generators.hpp> // generators                                 
 #include <boost/uuid/uuid_io.hpp>         // streaming operators etc.        
+#include <boost/filesystem.hpp>		  // Get file sizes
 
 class MonitorReceive: public Tool {
 
@@ -36,6 +39,7 @@ class MonitorReceive: public Tool {
   BoostStore* MRDData;
   BoostStore* PMTData;
   BoostStore* TrigData;
+  BoostStore* LAPPDData;
   std::vector<std::string> loaded_files;
 };
 

@@ -163,14 +163,16 @@ bool LoadWCSimLAPPD::Execute(){
 	
 	MCLAPPDHits->clear(); // clear any hits from previous trigger
 	
-	if(MCTriggernum>0){
+	bool splitSubtriggers = false;
+	m_data->CStore.Get("SplitSubTriggers",splitSubtriggers);
+	if((splitSubtriggers && (MCTriggernum>0))){
 		if(unassignedhits.size()==0){
 			if(verbosity>2) cout<<"no LAPPD hits to add to this trigger"<<endl;
 			return true;
 		} else {
 			if(verbosity>2) cout<<"looping over "<<unassignedhits.size()
 							  <<" LAPPD hits that weren't in the first trigger window"<<endl;
-			for(int hiti=0; hiti<unassignedhits.size(); hiti++){
+			for(int hiti=0; hiti<(int)unassignedhits.size(); hiti++){
 				MCLAPPDHit nexthit = unassignedhits.at(hiti);
 				double digitst = nexthit.GetTime(); // ABSOLUTE
 				double relativedigitst=digitst-wcsimtriggertime; // relative to trigger time

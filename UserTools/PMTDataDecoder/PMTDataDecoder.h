@@ -63,6 +63,10 @@ class PMTDataDecoder: public Tool {
   std::string InputFile;
   std::string Mode;
 
+  bool OffsetVME03;
+  bool OffsetVME01;
+  bool OffsetPositive;
+
   bool NewWavesBuilt;
   int ADCCountsToBuild;  //If a finished wave doesn't have this many ADC counts at least, don't add it for building
   int EntriesPerExecute;

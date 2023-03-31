@@ -5,4 +5,3 @@ InputFile ./configfiles/DataDecoderTank/my_files.txt
 DummyRunInfo 1
 StoreTrigOverlap 0
 ReadTrigOverlap 0
-StoreRawData 0
