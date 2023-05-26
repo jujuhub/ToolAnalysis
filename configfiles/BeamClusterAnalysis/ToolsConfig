@@ -8,4 +8,4 @@ myClusterFinder ClusterFinder ./configfiles/BeamClusterAnalysis/ClusterFinderCon
 myClusterClassifiers ClusterClassifiers ./configfiles/BeamClusterAnalysis/ClusterClassifiersConfig
 myEventSelector EventSelector ./configfiles/BeamClusterAnalysis/EventSelectorConfig
 myEventDisplay EventDisplay ./configfiles/BeamClusterAnalysis/EventDisplayConfig
-myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/BeamClusterAnalysis/PhaseIITreeMakerConfig
+#myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/BeamClusterAnalysis/PhaseIITreeMakerConfig

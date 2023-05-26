@@ -3,7 +3,7 @@ verbosity 6
 BuildType TankAndMRDAndCTCAndLAPPD
 ProcessedFilesBasename ProcessedRawData
 NumEventsPerPairing 200
-SavePath ./
+SavePath /pnfs/annie/persistent/users/jhe/
 
 MinNumWavesInSet 134 // 1=Just throw any waveforms into ANNIE events if you got em
 

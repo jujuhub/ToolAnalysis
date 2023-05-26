@@ -1,10 +1,10 @@
 #TimeClustering config file
 
-verbosity 1
+verbosity 2
 MinDigitsForTrack 3
 MaxMrdSubEventDuration 30
 MinSubeventTimeSep 30
-MakeMrdDigitTimePlot 0
+MakeMrdDigitTimePlot 1
 LaunchTApplication 0
 IsData 1
 #OutputROOTFile TimeClustering_MRDTest28_cluster40ns

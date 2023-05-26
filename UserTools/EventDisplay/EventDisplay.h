@@ -32,13 +32,6 @@
 #include "TList.h"
 #include "TFile.h"
 #include "TLatex.h"
-#include "TGeoManager.h"
-#include "TGeoMaterial.h"
-#include "TGeoMedium.h"
-#include "TGeoVolume.h"
-#include "TGeoNode.h"
-#include "TGeoSphere.h"
-#include "TVirtualGeoTrack.h"
 
 
 class EventDisplay: public Tool {
@@ -69,7 +62,6 @@ class EventDisplay: public Tool {
   void translate_xy(double vtxX, double vtxY, double vtxZ, double &xWall, double &yWall, int &status_hit, double &phi_calc);
   void find_projected_xyz(double vtxX, double vtxY, double vtxZ, double dirX, double dirY, double dirZ, double &projected_x, double &projected_y, double &projected_z);
   void ParseUserInput(std::string user_string);
-  void reset_3d();  //JH
 
  private:
 
@@ -116,10 +108,7 @@ class EventDisplay: public Tool {
     bool draw_ring_temp;
     bool draw_vertex_temp;
     bool use_filtered_digits;
-    double exit_pt_min_charge;  //JH
-    bool draw_3d_fmv;
-    bool draw_3d_mrd;
-    bool summary3d;
+    bool run_muon_fitter = false;
 
     //define event variables
     uint32_t evnum;
@@ -191,8 +180,6 @@ class EventDisplay: public Tool {
     std::map<unsigned long, std::vector<double>> mrd_x, mrd_y, mrd_z;
     std::map<unsigned long, int> mrd_orientation, mrd_half, mrd_side;
 
-    std::map<unsigned long, TGeoVolume *> tank_3d;
-
     //bool variables for schematic hit plot
     bool facc_hit;
     bool tank_hit;
@@ -229,21 +216,6 @@ class EventDisplay: public Tool {
     TText *title_mrd_side = nullptr;
     TText *title_mrd_top = nullptr;
     std::map<unsigned long, TBox*> mrd_paddles, box_mrd_paddles;
-
-    TBox *exit_pt = nullptr;  //JH
-    TGeoManager *ageom = nullptr;
-    TGeoMaterial *vacuum = nullptr;
-    TGeoMaterial *Fe = nullptr;
-    TGeoMedium *Air = nullptr;
-    TGeoMedium *Iron = nullptr;
-    TGeoVolume *EXPH = nullptr;  //experimental hall
-    char blockName[100];  //char array to form strings w/ sprintf
-    int N = 0, maxN = 0;  //Nth node
-    TGeoVolume *bBlock = nullptr;   //building block of PMTs
-    std::map<unsigned long, int> detkey_to_node;
-    Int_t track_index = 0;
-    Int_t ntracks = 0;
-    TVirtualGeoTrack *track = nullptr;
 
 
     //chankey WCSim ID mappings
@@ -282,8 +254,6 @@ class EventDisplay: public Tool {
     double min_time_overall;
     double max_cluster_time;
     double min_cluster_time;
-    unsigned long maximum_pmts_detkey;  //JH
-    unsigned long maximum_time_pmts_detkey;
 
     //sizes for drawings
     double size_top_drawing=0.1;
@@ -297,7 +267,6 @@ class EventDisplay: public Tool {
     TCanvas *canvas_pmt_supplementary;
     TCanvas *canvas_lappd;
     TPaveText* text_event_info = nullptr;
-    TCanvas *canvas_3d;
 
     //markers
     std::vector<TMarker*> vector_colordot;
@@ -306,7 +275,6 @@ class EventDisplay: public Tool {
     std::vector<TPolyMarker*> marker_pmts_top;
     std::vector<TPolyMarker*> marker_pmts_bottom;
     std::vector<TPolyMarker*> marker_pmts_wall;
-    std::vector<TPolyMarker*> marker_pmts_phi;
     std::vector<TPolyMarker*> marker_lappds;
     std::vector<TPolyMarker*> marker_mrd;
     TPolyMarker *marker_vtx = nullptr;
@@ -327,7 +295,6 @@ class EventDisplay: public Tool {
     std::map<int,TH1F*> charge_LAPPDs;
     double pmt_Qmax, pmt_Qmin, pmt_Tmax, pmt_Tmin, lappd_Qmax, lappd_Qmin, lappd_Tmax, lappd_Tmin;
     int pmt_Qbins, pmt_Tbins, lappd_Qbins, lappd_Tbins;
-    TH1F *rho_wall_pmts = nullptr;
 
     //legends
     TLegend *leg_charge = nullptr;

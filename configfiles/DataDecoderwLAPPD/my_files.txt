@@ -1,1 +1,4 @@
-/pnfs/annie/persistent/raw/raw/3653/RAWDataR3653S0p55
+#/pnfs/annie/persistent/raw/raw/3653/RAWDataR3653S0p55
+#/annie/app/users/tqzhang/My_LAPPD/MyToolAnalysis/4143/RAWDataR4143S0p0
+/annie/app/users/tqzhang/My_LAPPD/MyToolAnalysis/4143/RAWDataR4143S0p1
+/annie/app/users/tqzhang/My_LAPPD/MyToolAnalysis/4143/RAWDataR4143S0p2
