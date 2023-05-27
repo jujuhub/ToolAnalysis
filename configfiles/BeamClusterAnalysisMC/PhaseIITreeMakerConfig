@@ -1,6 +1,6 @@
 verbose 5
 
-OutputFile MCBeam_Gst_Run1008.ntuple.root
+OutputFile MCBeam_Gst_new_Run9000_NoSplitSubTriggers.ntuple.root
 TankClusterProcessing 1
 MRDClusterProcessing 1
 TriggerProcessing 1
