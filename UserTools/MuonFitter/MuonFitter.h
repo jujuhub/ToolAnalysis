@@ -82,6 +82,8 @@ class MuonFitter: public Tool {
     bool draw3d_fmv = false;
     bool draw3d_mrd = false;
     bool save_hists = false;
+    double PMTMRDOffset;
+    double deltaL = 0;
 
     std::ofstream pos_file;
     std::ofstream cpp_file;
@@ -92,6 +94,11 @@ class MuonFitter: public Tool {
     TCanvas *c_vtx_charge;
     TCanvas *c_vtx_detkey;
     TCanvas *c_charge_per_pmt;
+    TCanvas *c_effarea_detkey;
+    TCanvas *c_fpmt_detkey;
+    TCanvas *c_effarea_ai;
+    TCanvas *c_fpmt_ai;
+    TCanvas *c_eta_ai;
 
     TCanvas *canvas_ev_display; //test saving of ev displays
     std::map<uint32_t, TCanvas *> m_evdisplays;
@@ -103,6 +110,13 @@ class MuonFitter: public Tool {
     TGraph *gr_qdensity_out = nullptr;
     TGraph *gr_vtx_detkey_in = nullptr;
     TGraph *gr_vtx_detkey_out = nullptr;
+    TGraph *gr_effarea_detkey = nullptr;
+    TGraph *gr_effarea_ai = nullptr;
+    TGraph *gr_fpmt_detkey = nullptr;
+    TGraph *gr_fpmt_ai = nullptr;
+    TGraph *gr_eta_ai = nullptr;
+    TGraph *gr_qincone_ai = nullptr;
+    TGraph *gr_qoutcone_ai = nullptr;
     TH1D *h_alpha = nullptr;
     TH1D *h_expected_PE = nullptr;
     TH1D *h_phot_inc_angle = nullptr;
@@ -110,13 +124,37 @@ class MuonFitter: public Tool {
     TH1D *h_tank_track_len = nullptr;
     TH1D *h_closest_approach = nullptr;
     TH1D *h_num_mrd_layers = nullptr;
-    TH2D *h_vtx_charge = nullptr;
-    TH2D *h_charge_per_pmt = nullptr;
+    TH1D *h_truevtx_z = nullptr;
+    TH1D *h_lastvtx_z = nullptr;
+    TH1D *h_clusterhit_x = nullptr;
+    TH1D *h_clusterhit_y = nullptr;
+    TH1D *h_clusterhit_z = nullptr;
+    TH1D *h_clusterhit_detkey = nullptr;
+    TH1D *h_truevtx_angle = nullptr;
+    TH1D *h_tankexit_to_pmt = nullptr;
+    TH1D *h_tanktrack_ai = nullptr;
+    TH1D *h_eff_area_pmt = nullptr;
+    TH1D *h_fpmt = nullptr;
+    TH2D *h_eta_ai = nullptr;
+    TH1D *h_clusterhit_timespread = nullptr;
+    TH1D *h_clusterhit_time = nullptr;
+    TH1D *h_qincone_truevtx = nullptr;
+    TH1D *h_qoutcone_truevtx = nullptr;
 
     //event variables
+    int partnumber;
     uint32_t evnum;
     int runnumber;
     int subrunnumber;
+    int mcevnum;
+    uint16_t mctrignum;
+    std::string mcFile;
+    double trueVtxTime;
+    double trueVtxX, trueVtxY, trueVtxZ;
+    double trueDirX, trueDirY, trueDirZ;
+    double trueAngle;
+    int nrings;
+    std::vector<unsigned int> particles_ring;
 
     //geometry
     Geometry *geom = nullptr;
@@ -151,17 +189,20 @@ class MuonFitter: public Tool {
     //maps
     std::map<int, double> ChannelKeyToSPEMap;
     std::map<unsigned long, vector<Hit>> *tdcdata = nullptr;
+    std::map<int, double> m_pmt_area;
     std::map<int, double> m_pmt_eff;
     std::map<int, double> m_pmt_alpha;
     std::map<double, std::vector<Hit>> *m_all_clusters = nullptr;
     std::map<double, std::vector<MCHit>> *m_all_clusters_MC = nullptr;
-    std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys =nullptr;
+    std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys = nullptr;
+    std::vector<MCParticle> *mcParticles = nullptr;
 
     //mrd
     int numTracksInEv = 0;
     std::vector<BoostStore>* mrdTracks;   //the reconstructed tracks
     Position mrdStartVertex;
     Position mrdStopVertex;
+    Position tankExitPoint;
     double trackAngle = -69.;
     double trackAngleError = -69.;
     double penetrationDepth = -69.;
@@ -169,6 +210,7 @@ class MuonFitter: public Tool {
     int numLayersHit = 0;
     double energyLoss = 0.;
     double energyLossError = 0.;
+    double mrdStartTime = -69.;
 
 };
 
