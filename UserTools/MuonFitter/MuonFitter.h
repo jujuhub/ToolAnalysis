@@ -83,10 +83,13 @@ class MuonFitter: public Tool {
     bool draw3d_mrd = false;
     bool save_hists = false;
     double PMTMRDOffset;
-    double deltaL = 0;
+    double deltaL = 0.;
+    double insideAngle = -5.;
+    double outsideAngle = 5.;
 
     std::ofstream pos_file;
     std::ofstream cpp_file;
+    std::ofstream pehits_file;
 
     TFile *root_outp = nullptr;
     TCanvas *canvas_3d;
@@ -140,6 +143,10 @@ class MuonFitter: public Tool {
     TH1D *h_clusterhit_time = nullptr;
     TH1D *h_qincone_truevtx = nullptr;
     TH1D *h_qoutcone_truevtx = nullptr;
+    TH2D *h_total_pe_hits = nullptr;
+    TH1D *h_truevtx_recoexit_track = nullptr;
+    TH1D *h_truevtx_trueexit_track = nullptr;
+    TH1D *h_pmt_charge = nullptr;
 
     //event variables
     int partnumber;
@@ -152,6 +159,7 @@ class MuonFitter: public Tool {
     double trueVtxTime;
     double trueVtxX, trueVtxY, trueVtxZ;
     double trueDirX, trueDirY, trueDirZ;
+    double trueStopVtxX, trueStopVtxY, trueStopVtxZ;
     double trueAngle;
     int nrings;
     std::vector<unsigned int> particles_ring;

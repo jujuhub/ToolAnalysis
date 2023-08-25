@@ -34,6 +34,8 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("Draw3DMRD", draw3d_mrd);
   m_variables.Get("SaveHistograms", save_hists);
   m_variables.Get("DeltaL", deltaL);
+  m_variables.Get("InsideAngle", insideAngle);
+  m_variables.Get("OutsideAngle", outsideAngle);
 
   // Files
   std::string outfile;
@@ -117,11 +119,25 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_clusterhit_time = new TH1D("h_clusterhit_time", "Hit Time of Hits in Cluster", 70000, 0, 70000);
   h_clusterhit_time->GetXaxis()->SetTitle("hit time [ns]");
 
-  h_qincone_truevtx = new TH1D("h_qincone_truevtx", "Hits That Fall Inside Cone of True Vertex (<42 deg)", 5000, 0, 5000);
+  h_qincone_truevtx = new TH1D("h_qincone_truevtx", "Hits That Fall Inside Cone of True Vertex (<42 deg)", 500, 0, 500);
   h_qincone_truevtx->GetXaxis()->SetTitle("hit PE [#PE]");
 
-  h_qoutcone_truevtx = new TH1D("h_qoutcone_truevtx", "Hits That Fall Outside Cone of True Vertex (>50 deg)", 5000, 0, 5000);
+  h_qoutcone_truevtx = new TH1D("h_qoutcone_truevtx", "Hits That Fall Outside Cone of True Vertex (>50 deg)", 500, 0, 500);
   h_qoutcone_truevtx->GetXaxis()->SetTitle("hit PE [#PE]");
+
+  h_total_pe_hits = new TH2D("h_total_pe_hits", "Total PE vs Total Hits", 500, 0., 500., 8000, 0., 8000.);
+  h_total_pe_hits->GetXaxis()->SetTitle("# hits");
+  h_total_pe_hits->GetYaxis()->SetTitle("# PE");
+
+  h_truevtx_recoexit_track = new TH1D("h_truevtx_recoexit_track", "Tank Track Length (true vertex to reco tank exit)", 350, 0, 350);
+  h_truevtx_recoexit_track->GetXaxis()->SetTitle("track length [cm]");
+
+  h_truevtx_trueexit_track = new TH1D("h_truevtx_trueexit_track", "Tank Track Length (true vertex to true tank exit)", 350, 0, 350);
+  h_truevtx_trueexit_track->GetXaxis()->SetTitle("track length [cm]");
+
+  h_pmt_charge = new TH1D("h_pmt_charge", "Total Charge Seen By PMT", 500, 0, 500);
+  h_pmt_charge->GetXaxis()->SetTitle("charge [pe]");
+
 
   // total charge at ea vtx
   gr_vtx_charge_in = new TGraph();
@@ -233,6 +249,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_qoutcone_ai->SetMarkerStyle(32);
   gr_qoutcone_ai->SetMarkerColor(9);
   gr_qoutcone_ai->SetFillColor(0);
+
 
   // --------------------------------------------------
   // --- Retrieve Store variables ---------------------
@@ -472,6 +489,14 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   //cpp_file.open(cpp_fname.c_str());
   //cpp_file << "##evnum,nVtx,Qin,Qout,avgSumIn,avgSumOut,avgQin,avgQout" << std::endl;
 
+  pehits_file.open("tot_pe_hits.txt", std::ostream::app);
+  if (!pehits_file)
+  {
+    std::cout << " [debug] tot_pe_hits.txt does not exist! Creating now..." << std::endl;
+    pehits_file.open("tot_pe_hits.txt");
+    pehits_file << "##partfile,max_cluster_hits,max_cluster_charge" << std::endl;
+  }
+
   if (verbosity > 2) std::cout << "MuonFitter Tool: Initialization complete" << std::endl;
 
   return true;
@@ -524,6 +549,7 @@ bool MuonFitter::Execute(){
   // --------------------------------------------------
   // --- Get event info (MC) ------------------------
   // --------------------------------------------------
+  TVector3 trueTrackDir;
   if (!isData)
   {
     get_ok = m_data->Stores["ANNIEEvent"]->Get("MCParticles", mcParticles);
@@ -551,10 +577,18 @@ bool MuonFitter::Execute(){
     trueDirX = truevtx->GetDirection().X();
     trueDirY = truevtx->GetDirection().Y();
     trueDirZ = truevtx->GetDirection().Z();
+    trueTrackDir = TVector3(trueDirX,trueDirY,trueDirZ).Unit();
 
     double trueAngleRad = TMath::ACos(trueDirZ);
     trueAngle = trueAngleRad/(TMath::Pi()/180.);
     //h_truevtx_angle->Fill(trueAngle);
+
+    RecoVertex *truestopvtx = 0;
+    get_ok = m_data->Stores["RecoEvent"]->Get("TrueStopVertex", truestopvtx);
+    if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueStopVertex from RecoEvent Store!", v_error, verbosity); return false; }
+    trueStopVtxX = truestopvtx->GetPosition().X();
+    trueStopVtxY = truestopvtx->GetPosition().Y();
+    trueStopVtxZ = truestopvtx->GetPosition().Z();
 
     get_ok = m_data->Stores["RecoEvent"]->Get("NRings", nrings);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving NRings, true from RecoEvent!", v_error, verbosity); }
@@ -564,7 +598,7 @@ bool MuonFitter::Execute(){
 
 
   // --------------------------------------------------
-  // --- Check for particles other than muon ----------
+  // --- Check for particles other than muon (MC) -----
   // --------------------------------------------------
   bool hasPion = false;
   int n_rings = 0;
@@ -574,7 +608,7 @@ bool MuonFitter::Execute(){
     for (unsigned int mcp_i = 0; mcp_i < mcParticles->size(); mcp_i++)
     {
       MCParticle aparticle = mcParticles->at(mcp_i);
-      std::cout << " [debug] Ev " << mcevnum << ", particle pdg code: " << aparticle.GetPdgCode() << std::endl;
+      //std::cout << " [debug] Ev " << mcevnum << ", particle pdg code: " << aparticle.GetPdgCode() << std::endl;
       if (std::find(particles_ring.begin(), particles_ring.end(), mcp_i) != particles_ring.end())
       {
         ++n_rings;
@@ -584,7 +618,8 @@ bool MuonFitter::Execute(){
     std::cout << " [debug] n_rings (my counter): " << n_rings << std::endl;
     if (n_rings > 1) hasPion = true;
   }
-  if (hasPion) return false;
+  if (hasPion) return true;
+
 
   // --------------------------------------------------
   // --- Check for FMV hits ---------------------------
@@ -629,6 +664,10 @@ bool MuonFitter::Execute(){
     return true;
   }
 
+
+  // --------------------------------------------------
+  // --- Get MRD track params -------------------------
+  // --------------------------------------------------
   double tracklength = 0.;
   for(int track_i = 0; track_i < numTracksInEv; track_i++)
   {
@@ -674,17 +713,6 @@ bool MuonFitter::Execute(){
   double tankExitPointX = 100.*(tankExitPoint.X()-tank_center_x);
   double tankExitPointY = 100.*(tankExitPoint.Y()-tank_center_y);
   double tankExitPointZ = 100.*(tankExitPoint.Z()-tank_center_z);
-
-  // get distance btwn trueVtx and tankExitPoint
-  double trueTankTrackLength = 0.;
-  if (!isData)
-  {
-    trueTankTrackLength = TMath::Sqrt(pow(tankExitPointX-trueVtxX,2) + pow(tankExitPointY-trueVtxY,2) + pow(tankExitPointZ-trueVtxZ,2));
-    std::cout << " [debug] trueTankTrackLength: " << trueTankTrackLength << std::endl;
-  }
-  TVector3 trueTankTrack = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - TVector3(trueVtxX, trueVtxY, trueVtxZ);
-  double trueTankTrackAngle = trueTankTrack.Angle(TVector3(0,0,1));
-  std::cout << " [debug] trueTankTrackAngle: " << trueTankTrackAngle*180./TMath::Pi() << std::endl;
 
   // Create vectors for MRD start/stop
   TVector3 mrdStart((mrdStartVertex.X()-tank_center_x)*100., (mrdStartVertex.Y()-tank_center_y)*100., (mrdStartVertex.Z()-tank_center_z)*100.);   //[cm]
@@ -747,12 +775,6 @@ bool MuonFitter::Execute(){
   // make sure track originates in tank
   if (!inFV) { return true; }
 
-  if (!isData)
-  {
-    h_lastvtx_z->Fill(vtxCandidates.at(vtxCandidates.size()-1).Z());
-    h_truevtx_z->Fill(trueVtxZ);
-  }
-
   std::cout << "MuonFitter Tool: Num of vtxCandidates: " << vtxCandidates.size() << std::endl;
   double l_zmax = vtxCandidates.at(0).Z();
   double l_zmin = vtxCandidates.at(vtxCandidates.size()-1).Z();
@@ -764,6 +786,42 @@ bool MuonFitter::Execute(){
     TVector3 v1(vtxCandidates.at(i));
     double d = TMath::Sqrt(pow(v1.X()-v0.X(),2) + pow(v1.Y()-v0.Y(),2) + pow(v1.Z()-v0.Z(),2));
     //std::cout << "  [debug] distance btwn candidate vtx: " << d << std::endl;
+  }
+  if (!isData)
+  {
+    h_lastvtx_z->Fill(vtxCandidates.at(vtxCandidates.size()-1).Z());
+    h_truevtx_z->Fill(trueVtxZ);
+  }
+
+
+  // --------------------------------------------------
+  // --- Check short tracks ---------------------------
+  // --------------------------------------------------
+  // get distance btwn trueVtx and reco tankExitPoint
+  double trueRecoTankTrackLength = 0.;
+  if (!isData)
+  {
+    trueRecoTankTrackLength = TMath::Sqrt(pow(tankExitPointX-trueVtxX,2) + pow(tankExitPointY-trueVtxY,2) + pow(tankExitPointZ-trueVtxZ,2));
+    std::cout << " [debug] trueRecoTankTrackLength: " << trueRecoTankTrackLength << std::endl;
+
+    // skip if true vertex is downstream of tank
+    if (trueVtxZ > 0.)
+    {
+      std::cout << " SKIPPING event. True vertex is in downstream half of tank. " << mcevnum << std::endl;
+      //return true;
+    }
+
+    TVector3 trueTankTrack = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - TVector3(trueVtxX, trueVtxY, trueVtxZ);
+    // skip if tank track is short
+    if (trueRecoTankTrackLength < 100.)
+    {
+      std::cout << " Track less than 100 cm! SKIPPING! " << mcevnum << std::endl;
+      return true;
+    }
+    h_truevtx_recoexit_track->Fill(trueRecoTankTrackLength);
+
+    double trueTankTrackAngle = trueTankTrack.Angle(TVector3(0,0,1));
+    std::cout << " [debug] trueTankTrackAngle: " << trueTankTrackAngle*180./TMath::Pi() << std::endl;
   }
 
 
@@ -813,14 +871,19 @@ bool MuonFitter::Execute(){
   // Find the main cluster (max charge and in [0..2000ns] time window)
   double max_cluster = 0;
   double max_cluster_charge = 0;
+  double max_cluster_hits = 0;
 
   bool found_muon = false;
   double earliest_hittime = 0;
   std::vector<double> v_cluster_times;
+  std::map<unsigned long, double> m_cluster_charge;
   if (isData)
   {
     for (std::pair<double, std::vector<Hit>>&& apair : *m_all_clusters)
     {
+      m_cluster_charge.clear();
+      for (unsigned long detkey = 332 ; detkey < 464; detkey++) { m_cluster_charge.emplace(detkey, 0.); }
+
       std::vector<Hit>& cluster_hits = apair.second;
       double temp_time = 0;
       double temp_charge = 0;
@@ -844,6 +907,7 @@ bool MuonFitter::Execute(){
           h_clusterhit_y->Fill(100.*(det_pos.Y()-tank_center_y));
           h_clusterhit_z->Fill(100.*(det_pos.Z()-tank_center_z));
           h_clusterhit_detkey->Fill(detkey);
+          //m_cluster_charge[detkey] += cluster_hits.at(ihit).GetCharge();
         }
       }
       if (temp_hits > 0) temp_time /= temp_hits;  //mean time
@@ -854,6 +918,7 @@ bool MuonFitter::Execute(){
         found_muon = true;
         max_cluster_charge = temp_charge;
         max_cluster = apair.first;    //actually the cluster time (same as mean time above)
+        max_cluster_hits = cluster_hits.size();
       }
     }
   }
@@ -861,12 +926,16 @@ bool MuonFitter::Execute(){
   {
     for (std::pair<double, std::vector<MCHit>>&& apair : *m_all_clusters_MC)
     {
+      m_cluster_charge.clear();
+      for (unsigned long detkey = 332 ; detkey < 464; detkey++) { m_cluster_charge.emplace(detkey, 0.); }
       std::vector<MCHit>& cluster_hits_MC = apair.second;
       double temp_time = 0;
       double temp_charge = 0;
       int temp_hits = 0;
-      std::cout << " [debug] cluster_hits_MC.size (num hits in cluster): " << cluster_hits_MC.size() << std::endl;
       std::vector<double> v_cluster_hits;
+
+      std::cout << " [debug] cluster_hits_MC.size (num hits in cluster): " << cluster_hits_MC.size() << std::endl;
+
       for (int ihit = 0; ihit < cluster_hits_MC.size(); ihit++)
       {
         temp_hits++;
@@ -888,6 +957,7 @@ bool MuonFitter::Execute(){
           h_clusterhit_y->Fill(100.*(det_pos.Y()-tank_center_y));
           h_clusterhit_z->Fill(100.*(det_pos.Z()-tank_center_z));
           h_clusterhit_detkey->Fill(detkey);
+          m_cluster_charge[detkey] += cluster_hits_MC.at(ihit).GetCharge();
         }
       }
       sort(v_cluster_hits.begin(), v_cluster_hits.end());
@@ -906,8 +976,20 @@ bool MuonFitter::Execute(){
         found_muon = true;
         max_cluster_charge = temp_charge;
         max_cluster = apair.first;    //actually the cluster time (same as mean time above)
+        //max_cluster_hits = cluster_hits_MC.size();
         earliest_hittime = v_cluster_hits.at(0);
         std::cout << " [debug] earliest_hittime: " << earliest_hittime << std::endl;
+
+        max_cluster_hits = 0;
+        for (unsigned long detkey = 332; detkey < 464; detkey++)
+        {
+          if (m_cluster_charge[detkey] > 0.)
+          {
+            max_cluster_hits++;
+            h_pmt_charge->Fill(m_cluster_charge[detkey]);
+          }
+        }
+
       }
     }
   }
@@ -919,7 +1001,7 @@ bool MuonFitter::Execute(){
   std::cout << std::endl;
   std::cout << " [debug] max_cluster (chosen cluster time): " << max_cluster << std::endl;
   std::cout << " [debug] max_cluster_charge: " << max_cluster_charge << std::endl;
-
+  std::cout << " [debug] max_cluster_hits: " << max_cluster_hits << std::endl;
 
   // --------------------------------------------------
   // --- Check coincidence with MRD -------------------
@@ -937,6 +1019,15 @@ bool MuonFitter::Execute(){
               << "Tank cluster and MRD cluster times are too different." << std::endl;
   }
 
+  // save info about main/max cluster
+  h_total_pe_hits->Fill(max_cluster_hits, max_cluster_charge);
+
+  // save to txt files
+  pehits_file << "p" << partnumber << "_";
+  if (isData) pehits_file << evnum;
+  else pehits_file << mcevnum;
+  pehits_file << "," << max_cluster_hits << "," << max_cluster_charge << std::endl;
+
 
   double max_eta = 0.;
 
@@ -949,13 +1040,200 @@ bool MuonFitter::Execute(){
     std::vector<MCHit> cluster_hits_MC;
     if (isData) { cluster_hits = m_all_clusters->at(max_cluster); }
     else { cluster_hits_MC = m_all_clusters_MC->at(max_cluster); }
-
     std::vector<unsigned long> cluster_detkeys = m_all_clusters_detkeys->at(max_cluster);
-
-    //XXX:if the rest of this code block is compatible whether data or MC, unindent it 2 spaces
     std::vector<double> x_hits, y_hits, z_hits;
     double cluster_charge = 0.;   //TODO:make cluster or individual PMT charge cut?
+
+    // CALCULATE ai FOR EACH PMT METHOD
+    std::map<unsigned long, double> charge;
+    std::map<int, std::vector<double>> m_PE_ai;
+    std::map<int, std::vector<double>> m_fpmt_ai;
+
+    if (isData)
+    {
+      charge.clear();
+      for (unsigned long detkey = 332; detkey < 464; ++detkey) { charge.emplace(detkey, 0.); }
+
+      std::cout << " Need to fill in code for data case (ai method)" << std::endl;
+    }
+    else  //is MC
+    {
+      charge.clear();
+      for (unsigned long detkey = 332; detkey < 464; ++detkey) { charge.emplace(detkey, 0.); }
+
+      for (int i = 0; i < (int)cluster_hits_MC.size(); ++i)
+      {
+        //for each hit
+        int chankey = cluster_hits_MC.at(i).GetTubeId();
+        std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
+        if (it != ChannelKeyToSPEMap.end())
+        {
+          Detector* this_detector = geom->ChannelToDetector(chankey);
+          unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
+          Position det_pos = this_detector->GetDetectorPosition();
+          double hit_PE = cluster_hits_MC.at(i).GetCharge();  //in PE
+          double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
+          double hit_time = cluster_hits_MC.at(i).GetTime();
+          double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
+          double hitY = 100.*(det_pos.Y()-tank_center_y);
+          double hitZ = 100.*(det_pos.Z()-tank_center_z);
+          x_hits.push_back(hitX);
+          y_hits.push_back(hitY);
+          z_hits.push_back(hitZ);
+          Direction dirPMT = this_detector->GetDetectorDirection();
+          TVector3 pmt_dir = TVector3(dirPMT.X()*100., dirPMT.Y()*100., dirPMT.Z()*100.).Unit();
+
+          // keep track of total charge seen by each PMT
+          charge[detkey] += hit_PE;
+
+          // select MC muons that are basically traveling straight ahead
+          //if (trueAngle < -10. || trueAngle > 10.) continue;
+          h_truevtx_angle->Fill(trueAngle);
+
+
+          // get vector from tankExitPoint to PMT (Ri)
+          TVector3 vec_Ri = TVector3(hitX,hitY,hitZ) - TVector3(tankExitPointX,tankExitPointY,tankExitPointZ);
+          double Ri = vec_Ri.Mag();
+          h_tankexit_to_pmt->Fill(Ri);
+          std::cout << " [debug] vec_Ri: " << vec_Ri.X() << "," << vec_Ri.Y() << "," << vec_Ri.Z() << std::endl;
+          std::cout << " [debug] vec_Ri direction: " << vec_Ri.Unit().X() << "," << vec_Ri.Unit().Y() << "," << vec_Ri.Unit().Z() << std::endl;
+
+          // get angle btwn Ri and muon direction (ai)
+          double ang_alpha = vec_Ri.Angle(-mrdTrackDir);  //rad
+          std::cout << " [debug] ang_alpha, detkey: " << ang_alpha*180./TMath::Pi() << ", " << detkey << std::endl;
+          std::cout << " [debug] tankExitPoint: " << tankExitPointX << "," << tankExitPointY << "," << tankExitPointZ << std::endl;
+
+          double ai = Ri * TMath::Sin(ang_alpha) / TMath::Tan(CHER_ANGLE_RAD) + Ri * TMath::Cos(ang_alpha);
+          h_tanktrack_ai->Fill(ai);
+
+          // get the vector from the vertex of ai to the PMT (bi)
+          std::cout << " [debug] hitXYZ for detkey " << detkey << ": " << hitX << "," << hitY << "," << hitZ << std::endl;
+          TVector3 vec_ai = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - ai*mrdTrackDir;  //this is along the track
+          std::cout << " [debug] vec_ai: " << vec_ai.X() << "," << vec_ai.Y() << "," << vec_ai.Z() << std::endl;
+          TVector3 vec_bi = TVector3(hitX,hitY,hitZ) - vec_ai;
+          std::cout << " [debug] vec_bi: " << vec_bi.X() << "," << vec_bi.Y() << "," << vec_bi.Z() << std::endl;
+
+          //std::cout << " [debug] angle check: " << vec_bi.Angle(mrdTrackDir)*180./TMath::Pi() << std::endl;
+
+          // find angle btwn true vertex and hit
+          TVector3 vec_truevtx_hit = TVector3(hitX,hitY,hitZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+          double anglePmtTrueVtx = vec_truevtx_hit.Angle(mrdTrackDir)*180./TMath::Pi();
+          //if (anglePmtTrueVtx < CHER_ANGLE_DEG+insideAngle) h_qincone_truevtx->Fill(it_PE);
+          //if (anglePmtTrueVtx > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(hit_PE);
+
+          // loop through all hits for this ai and determine whether in/out cone
+          double qInCone = 0., qOutCone = 0.;
+          for (int j = 0; j < (int)cluster_hits_MC.size(); ++j)
+          {
+            //for each hit
+            int chankey = cluster_hits_MC.at(j).GetTubeId();
+            std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
+            if (it != ChannelKeyToSPEMap.end())
+            {
+              Detector* this_detector = geom->ChannelToDetector(chankey);
+             unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
+              Position det_pos = this_detector->GetDetectorPosition();
+              double hit_PE = cluster_hits_MC.at(j).GetCharge();  //in PE
+              double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
+              double hit_time = cluster_hits_MC.at(j).GetTime();
+              double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
+              double hitY = 100.*(det_pos.Y()-tank_center_y);   //[cm]
+              double hitZ = 100.*(det_pos.Z()-tank_center_z);   //[cm]
+
+              TVector3 vec_ai_pmt = TVector3(hitX,hitY,hitZ) - vec_ai;
+              double anglePmtAi = vec_ai_pmt.Angle(mrdTrackDir)*180./TMath::Pi();
+              //std::cout << " [debug] anglePmtAi: " << anglePmtAi << std::endl;
+              if (anglePmtAi < CHER_ANGLE_DEG-5.) qInCone += hit_PE;
+              if (anglePmtAi > CHER_ANGLE_DEG+5.) qOutCone += hit_PE;
+            }
+          }
+          gr_qincone_ai->SetPoint(i, ai, qInCone);
+          gr_qoutcone_ai->SetPoint(i, ai, qOutCone);
+
+          // get angle btwn vector bi and pmt dir
+          double psi = vec_bi.Angle(-pmt_dir);
+          if (psi > TMath::Pi()/2.) psi = TMath::Pi()-psi;
+          //std::cout << " [debug] psi(+), psi(-): " << psi*180./TMath::Pi() << ", " << vec_bi.Angle(pmt_dir)*180./TMath::Pi() << std::endl;
+
+          // calculate the area of PMT & frustum
+          //double area_pmt = 0.5*TMath::Pi()*pow(4.*2.54, 2)*(1. + TMath::Cos(psi));
+          double eff_area_pmt = 0.5*m_pmt_area[detkey]*(1.+TMath::Cos(psi));
+          h_eff_area_pmt->Fill(eff_area_pmt);
+          double area_frustum = 2.*TMath::Pi()*(deltaL)*Ri;
+          double f_pmt = eff_area_pmt / area_frustum;
+          h_fpmt->Fill(f_pmt);
+
+          gr_effarea_detkey->SetPoint(i, detkey, eff_area_pmt);
+          gr_fpmt_detkey->SetPoint(i, detkey, f_pmt);
+          gr_effarea_ai->SetPoint(i, ai, eff_area_pmt);
+          gr_fpmt_ai->SetPoint(i, ai, f_pmt);
+          //gr_eta_ai->SetPoint(i, ai, hit_PE / f_pmt);
+
+          h_eta_ai->Fill(ai, hit_PE / f_pmt);
+
+          for (int i = 55; i < 500; i+=deltaL)
+          {
+            if (ai >= i-deltaL/2 && ai < i+deltaL/2)
+            {
+              m_PE_ai[i].push_back(hit_PE);
+              m_fpmt_ai[i].push_back(f_pmt);
+            }
+          }
+
+
+          //XXX: checking PMT direction by drawing sphere in front of PMT
+          TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
+          if (detkey == 400)
+          {
+            // tankExit
+            sprintf(blockName,"tankExit_%u",N);
+            bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
+            bBlock->SetLineColor(3);
+            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(tankExitPointX, tankExitPointY, tankExitPointZ));
+            N++;
+
+            // direction of Ri
+            sprintf(blockName,"RiDir_%u",N);
+            bBlock = ageom->MakeSphere(blockName, Iron, 0,1.5,0,180,0,360);
+            bBlock->SetLineColor(5);
+            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(Ri_dir.X(), Ri_dir.Y(), Ri_dir.Z()));
+            N++;
+
+            // bi vertex
+            sprintf(blockName, "bi_%u",N);
+            bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
+            bBlock->SetLineColor(9);
+            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(vec_bi.X()+vec_ai.X(), vec_bi.Y()+vec_ai.Y(), vec_bi.Z()+vec_ai.Z()));
+            N++;
+          } //end if detkey==400
+
+        } //end if ChannelKeytoSPEMap
+      } //end for loop thru cluster hits
+    } //end if going thru cluster 1x
+
+    // find which pmt charges are inside/outside cone of true track direction
+    for (unsigned long detkey = 332; detkey < 464; ++detkey)
+    {
+      if (charge[detkey] != 0.)
+      {
+        // find vector from true vertex to PMT
+        TVector3 vec_pmt = TVector3(x_pmt[detkey],y_pmt[detkey],z_pmt[detkey]) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+        std::cout << " [debug] xyz_pmt[detkey] " << detkey << ": " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << std::endl;
+        // find angle between pmt vector (vec_pmt) and true track direction
+        double pmt_angle = vec_pmt.Angle(trueTrackDir)*180./TMath::Pi();
+        std::cout << " [debug] vec_pmt: " << vec_pmt.X() << "," << vec_pmt.Y() << "," << vec_pmt.Z() << std::endl;
+        std::cout << " [debug] pmt_angle: " << pmt_angle << std::endl;
+        std::cout << " [debug] trueTrackDir: " << trueTrackDir.X() << "," << trueTrackDir.Y() << "," << trueTrackDir.Z() << std::endl;
+        std::cout << " [debug] trueVtx: " << trueVtxX << "," << trueVtxY << "," << trueVtxZ << std::endl;
+        std::cout << " [debug] trueStopVtx: " << trueStopVtxX << "," << trueStopVtxY << "," << trueStopVtxZ << std::endl;
+
+        if (pmt_angle < CHER_ANGLE_DEG+insideAngle) h_qincone_truevtx->Fill(charge[detkey]);
+        if (pmt_angle > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(charge[detkey]);
+      }
+    }
+
   
+    // STEPPING BACK VTX CANDIDATES METHOD
     std::map<int, double> m_vtx_charge_incone;   //map of total charge seen at ea vtx candidate
     std::map<int, double> m_vtx_charge_per_pmt_incone;
     std::map<int, double> m_vtx_detkey_incone;
@@ -988,8 +1266,6 @@ bool MuonFitter::Execute(){
       std::vector<double> v_charges_incone;
       std::vector<double> v_charges_outcone;
       std::cout << " [debug] WORKING ON VTX c = " << c << std::endl;
-      std::map<int, std::vector<double>> m_PE_ai;
-      std::map<int, std::vector<double>> m_fpmt_ai;
       if (isData)
       {
         for (int i = 0; i < (int)cluster_hits.size(); ++i)
@@ -1008,9 +1284,6 @@ bool MuonFitter::Execute(){
             double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
             double hitY = 100.*(det_pos.Y()-tank_center_y);
             double hitZ = 100.*(det_pos.Z()-tank_center_z);
-            x_hits.push_back(hitX);
-            y_hits.push_back(hitY);
-            z_hits.push_back(hitZ);
 
             Direction dirPMT = this_detector->GetDetectorDirection();
 
@@ -1074,9 +1347,6 @@ bool MuonFitter::Execute(){
             double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
             double hitY = 100.*(det_pos.Y()-tank_center_y);
             double hitZ = 100.*(det_pos.Z()-tank_center_z);
-            x_hits.push_back(hitX);
-            y_hits.push_back(hitY);
-            z_hits.push_back(hitZ);
 
             // individual PMT charge cut
 /*            if (hit_PE < 10) continue;
@@ -1129,147 +1399,6 @@ bool MuonFitter::Execute(){
             // --------------------------------------------------
             if (c==0)   //only want to do this with cluster once
             {
-              std::cout << " c = 0" << std::endl;
-              // select MC muons that are basically traveling straight ahead
-              //if (trueAngle < -10. || trueAngle > 10.) { continue; }
-              h_truevtx_angle->Fill(trueAngle);   //should have angles fall btwn -10 and 10.
-
-              // XXX XXX XXX XXX XXX METHOD ON HOLD FOR NOW
-              // determine radius and area of Cherenkov ring/disc
-/*              double inner_r = c*10.*TMath::Tan(CHER_ANGLE_RAD);  //[cm]
-              double outer_r = inner_r + 10.*TMath::Tan(CHER_ANGLE_RAD);
-              std::cout << " inner_r, outer_r: " << inner_r << ", " << outer_r << std::endl;
-
-              double r = TMath::Sqrt(pow(tankExitPointX-hitX,2) + pow(tankExitPointY-hitY,2) + pow(tankExitPointZ-hitZ,2));
-
-              if (r >= inner_r && r <= outer_r && vtxCandidates.at(c).Z() <= tankExitPointZ)
-              {
-                std::cout << "inside ring!" << std::endl;
-                // add the charge of the PMT that's inside the ring
-                // determine photon density?
-              }
-              // determine which PMTs fall in ring area...
-              // position correction too? i.e. needs to be near center of tank?
-              // need a point on the tank wall
-              // XXX XXX XXX XXX XXX
-*/
-
-
-              // get vector from tankExitPoint to PMT (Ri)
-              TVector3 vec_Ri = TVector3(hitX,hitY,hitZ) - TVector3(tankExitPointX,tankExitPointY,tankExitPointZ);
-              double Ri = vec_Ri.Mag();
-              h_tankexit_to_pmt->Fill(Ri);
-              std::cout << " [debug] vec_Ri: " << vec_Ri.X() << "," << vec_Ri.Y() << "," << vec_Ri.Z() << std::endl;
-              std::cout << " [debug] vec_Ri direction: " << vec_Ri.Unit().X() << "," << vec_Ri.Unit().Y() << "," << vec_Ri.Unit().Z() << std::endl;
-
-              // get angle btwn Ri and muon direction (ai)
-              double ang_alpha = vec_Ri.Angle(-mrdTrackDir);  //rad
-              std::cout << " [debug] ang_alpha, detkey: " << ang_alpha*180./TMath::Pi() << ", " << detkey << std::endl;
-              std::cout << " [debug] tankExitPoint: " << tankExitPointX << "," << tankExitPointY << "," << tankExitPointZ << std::endl;
-
-              double ai = Ri * TMath::Sin(ang_alpha) / TMath::Tan(CHER_ANGLE_RAD) + Ri * TMath::Cos(ang_alpha);
-              h_tanktrack_ai->Fill(ai);
-
-              // get the vector from the vertex of ai to the PMT (bi)
-              std::cout << " [debug] hitXYZ: " << hitX << "," << hitY << "," << hitZ << std::endl;
-              TVector3 vec_ai = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - ai*mrdTrackDir;  //this is along the track
-              std::cout << " [debug] vec_ai: " << vec_ai.X() << "," << vec_ai.Y() << "," << vec_ai.Z() << std::endl;
-              TVector3 vec_bi = TVector3(hitX,hitY,hitZ) - vec_ai;
-              std::cout << " [debug] vec_bi: " << vec_bi.X() << "," << vec_bi.Y() << "," << vec_bi.Z() << std::endl;
-
-              std::cout << " [debug] angle check: " << vec_bi.Angle(mrdTrackDir)*180./TMath::Pi() << std::endl;
-
-              // find angle btwn true vertex and hit
-              TVector3 vec_truevtx_hit = TVector3(hitX,hitY,hitZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
-              double anglePmtTrueVtx = vec_truevtx_hit.Angle(mrdTrackDir)*180./TMath::Pi();
-              if (anglePmtTrueVtx < CHER_ANGLE_DEG+1.) h_qincone_truevtx->Fill(hit_PE);
-              if (anglePmtTrueVtx > CHER_ANGLE_DEG+9.) h_qoutcone_truevtx->Fill(hit_PE);
-
-              // loop through all hits for this ai and determine whether in/out cone
-              double qInCone = 0., qOutCone = 0.;
-              for (int j = 0; j < (int)cluster_hits_MC.size(); ++j)
-              {
-                //for each hit
-                int chankey = cluster_hits_MC.at(j).GetTubeId();
-                std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
-                if (it != ChannelKeyToSPEMap.end())
-                {
-                  Detector* this_detector = geom->ChannelToDetector(chankey);
-                  unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
-                  Position det_pos = this_detector->GetDetectorPosition();
-                  double hit_PE = cluster_hits_MC.at(j).GetCharge();  //in PE
-                  double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
-                  double hit_time = cluster_hits_MC.at(j).GetTime();
-                  double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
-                  double hitY = 100.*(det_pos.Y()-tank_center_y);   //[cm]
-                  double hitZ = 100.*(det_pos.Z()-tank_center_z);   //[cm]
-
-                  TVector3 vec_ai_pmt = TVector3(hitX,hitY,hitZ) - vec_ai;
-                  double anglePmtAi = vec_ai_pmt.Angle(mrdTrackDir)*180./TMath::Pi();
-                  //std::cout << " [debug] anglePmtAi: " << anglePmtAi << std::endl;
-                  if (anglePmtAi < CHER_ANGLE_DEG-5.) qInCone += hit_PE;
-                  if (anglePmtAi > CHER_ANGLE_DEG+5.) qOutCone += hit_PE;
-                }
-              }
-              gr_qincone_ai->SetPoint(i, ai, qInCone);
-              gr_qoutcone_ai->SetPoint(i, ai, qOutCone);
-
-              // get angle btwn vector bi and pmt dir
-              double psi = vec_bi.Angle(-pmt_dir);
-              if (psi > TMath::Pi()/2.) psi = TMath::Pi()-psi;
-              //std::cout << " [debug] psi(+), psi(-): " << psi*180./TMath::Pi() << ", " << vec_bi.Angle(pmt_dir)*180./TMath::Pi() << std::endl;
-
-              // calculate the area of PMT & frustum
-              //double area_pmt = 0.5*TMath::Pi()*pow(4.*2.54, 2)*(1. + TMath::Cos(psi));
-              double eff_area_pmt = 0.5*m_pmt_area[detkey]*(1.+TMath::Cos(psi));
-              h_eff_area_pmt->Fill(eff_area_pmt);
-              double area_frustum = 2.*TMath::Pi()*(deltaL)*Ri;
-              double f_pmt = eff_area_pmt / area_frustum;
-              h_fpmt->Fill(f_pmt);
-
-              gr_effarea_detkey->SetPoint(i, detkey, eff_area_pmt);
-              gr_fpmt_detkey->SetPoint(i, detkey, f_pmt);
-              gr_effarea_ai->SetPoint(i, ai, eff_area_pmt);
-              gr_fpmt_ai->SetPoint(i, ai, f_pmt);
-              //gr_eta_ai->SetPoint(i, ai, hit_PE / f_pmt);
-
-              h_eta_ai->Fill(ai, hit_PE / f_pmt);
-
-              for (int i = 55; i < 500; i+=deltaL)
-              {
-                if (ai >= i-deltaL/2 && ai < i+deltaL/2)
-                {
-                  m_PE_ai[i].push_back(hit_PE);
-                  m_fpmt_ai[i].push_back(f_pmt);
-                }
-              }
-
-
-              //XXX: checking PMT direction by drawing sphere in front of PMT
-              TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
-              if (detkey == 400)
-              {
-                // tankExit
-                sprintf(blockName,"tankExit_%u",N);
-                bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
-                bBlock->SetLineColor(3);
-                EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(tankExitPointX, tankExitPointY, tankExitPointZ));
-                N++;
-
-                // direction of Ri
-                sprintf(blockName,"RiDir_%u",N);
-                bBlock = ageom->MakeSphere(blockName, Iron, 0,1.5,0,180,0,360);
-                bBlock->SetLineColor(5);
-                EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(Ri_dir.X(), Ri_dir.Y(), Ri_dir.Z()));
-                N++;
-
-                // bi vertex
-                sprintf(blockName, "bi_%u",N);
-                bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
-                bBlock->SetLineColor(9);
-                EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(vec_bi.X()+vec_ai.X(), vec_bi.Y()+vec_ai.Y(), vec_bi.Z()+vec_ai.Z()));
-                N++;
-              }
             } // end if c==0
 
           } //exit ChannelKeyToSPEMap if statement 
@@ -1755,8 +1884,7 @@ bool MuonFitter::Execute(){
     c_eta_ai->SetName(ss_eta_ai_name.str().c_str());
     if (!isData)
     { //indicate distance btwn trueVtx and tankExitPoint
-      std::cout << " [debug] drawing trueTankTrackLength: " << trueTankTrackLength << std::endl;
-      TLine *lTrueTankTrack = new TLine(trueTankTrackLength, 0, trueTankTrackLength, max_eta+50);
+      TLine *lTrueTankTrack = new TLine(trueRecoTankTrackLength, 0, trueRecoTankTrackLength, max_eta+50);
       lTrueTankTrack->SetLineColor(4);
       lTrueTankTrack->SetLineWidth(2);
       lTrueTankTrack->Draw();
@@ -1802,6 +1930,9 @@ bool MuonFitter::Finalise(){
   h_eta_ai->Write();
   h_qincone_truevtx->Write();
   h_qoutcone_truevtx->Write();
+  h_total_pe_hits->Write();
+  h_truevtx_recoexit_track->Write();
+  h_pmt_charge->Write();
 
   // Close 3D canvas
   if (plot3d)
@@ -1823,6 +1954,7 @@ bool MuonFitter::Finalise(){
   root_outp->Close();
   //pos_file.close();
   //cpp_file.close();
+  pehits_file.close();
 
   Log("MuonFitter Tool: Exiting", v_message, verbosity);
   return true;
