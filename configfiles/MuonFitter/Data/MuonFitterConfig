@@ -1,0 +1,18 @@
+verbosity 3
+
+OutputFile MuonFitter_R2630.root
+IsData 1                # 0:is data, not MC; 1:not data, is MC
+LuxArea 506.7           # 10-inch R7081 Hamamatsu
+EtelArea 613.1          # 11-inch D784UKFLB ETEL
+HamamatsuArea 324.3     # 8-inch R5912-100 Hamamatsu
+WatchboyArea 506.7      # 10-inch R7081 Hamamatsu
+WatchmanArea 506.7      # 10-inch R7081-100 Hamamatsu
+PMTMRDOffset 745        # delay btwn tank and MRD PMTs
+DeltaL 10               # some distance muon travels [cm]
+InsideAngle 1.          # degrees added to Cherenkov angle for hits to be considered inside cone
+OutsideAngle 9.         # degrees added to Cherenkov angle for hits to be considered outside cone
+
+Plot3D 1                # 0:no plot; 1:yes plot
+Draw3DFMV 1
+Draw3DMRD 1
+SaveHistograms 0        # 0:no; 1:yes

@@ -1,0 +1,20 @@
+verbosity 3
+
+OutputFile MC_MuonFitter_99.root
+IsData 0                # 0:is data, not MC; 1:not data, is MC
+LuxArea 506.7           # 10-inch R7081 Hamamatsu
+EtelArea 613.1          # 11-inch D784UKFLB ETEL
+HamamatsuArea 324.3     # 8-inch R5912-100 Hamamatsu
+WatchboyArea 506.7      # 10-inch R7081 Hamamatsu
+WatchmanArea 506.7      # 10-inch R7081-100 Hamamatsu
+PMTMRDOffset 0          # delay btwn tank and MRD PMTs
+DeltaL 15               # some distance muon travels [cm]
+InsideAngle 1.          # degrees added to Cherenkov angle for hits to be considered inside cone
+OutsideAngle 9.         # degrees added to Cherenkov angle for hits to be considered outside cone
+PMTChargeThreshold 2    # minimum amount of charge seen by PMT
+EtaThreshold 500        # threshold to find best vertex
+
+Plot3D 1                # 0:no plot; 1:yes plot
+Draw3DFMV 0
+Draw3DMRD 0
+SaveHistograms 0        # 0:no; 1:yes

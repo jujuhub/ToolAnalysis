@@ -36,6 +36,8 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("DeltaL", deltaL);
   m_variables.Get("InsideAngle", insideAngle);
   m_variables.Get("OutsideAngle", outsideAngle);
+  m_variables.Get("PMTChargeThreshold", PMTQCut);
+  m_variables.Get("EtaThreshold", EtaThreshold);
 
   // Files
   std::string outfile;
@@ -67,19 +69,19 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_hit_angles = new TH1D("h_hit_angles", "Hit Angles wrt Vertex and MRD Track Dir", 180, 0., 180.);
   h_hit_angles->GetXaxis()->SetTitle("hit angle [deg]");
 
-  h_tank_track_len = new TH1D("h_tank_track_len", "Length of Tank Tracks", 500, 0., 500.);
-  h_tank_track_len->GetXaxis()->SetTitle("track length [cm]");
+  h_fitted_tank_track_len = new TH1D("h_fitted_tank_track_len", "Length of Tank Tracks", 500, 0., 500.);
+  h_fitted_tank_track_len->GetXaxis()->SetTitle("track length [cm]");
 
   h_closest_approach = new TH1D("h_closest_approach", "Distance of Closest Approach (Btwn Vtx & Tank Ctr)", 500, 0., 500.);
   h_closest_approach->GetXaxis()->SetTitle("distance to tank center [cm]");
 
-  h_num_mrd_layers= new TH1D("h_num_mrd_layers", "Num MRD Layers Hit", 50, 0, 50.);
+  h_num_mrd_layers = new TH1D("h_num_mrd_layers", "Num MRD Layers Hit", 50, 0, 50.);
   h_num_mrd_layers->GetXaxis()->SetTitle("# layers");
   
   h_truevtx_z = new TH1D("h_truevtx_z", "Z coordinate of True Vertex", 300, -150., 150.);
   h_truevtx_z->GetXaxis()->SetTitle("Z [cm]");
 
-  h_lastvtx_z= new TH1D("h_lastvtx_z", "Z coordinate of Last Candidate Vertex", 300, -150., 150.);
+  h_lastvtx_z = new TH1D("h_lastvtx_z", "Z coordinate of Last Candidate Vertex", 300, -150., 150.);
   h_lastvtx_z->GetXaxis()->SetTitle("Z [cm]");
 
   h_clusterhit_x = new TH1D("h_clusterhit_x", "X coordinate of Single Cluster Hits", 300, -150., 150.);
@@ -137,6 +139,12 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
 
   h_pmt_charge = new TH1D("h_pmt_charge", "Total Charge Seen By PMT", 500, 0, 500);
   h_pmt_charge->GetXaxis()->SetTitle("charge [pe]");
+
+  h_lr_avg_eta = new TH1D("h_lr_avg_eta", "Avg Eta to Left/Right of True Tank Track Length", 100, 0, 5000);
+  h_lr_avg_eta->GetXaxis()->SetTitle("eta [PE/cm]");
+
+  h_avg_eta = new TH1D("h_avg_eta", "Overall Average Eta", 100, 0, 5000);
+  h_avg_eta->GetXaxis()->SetTitle("eta [PE/cm]");
 
 
   // total charge at ea vtx
@@ -237,6 +245,14 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_eta_ai->SetFillColor(0);
   gr_eta_ai->GetXaxis()->SetTitle("ai [cm]");
   gr_eta_ai->GetYaxis()->SetTitle("#PE/f (eta)");
+
+  gr_running_avg = new TGraph();
+  gr_running_avg->SetLineWidth(0);
+  gr_running_avg->SetMarkerStyle(8);
+  gr_running_avg->SetMarkerColor(38);
+  gr_running_avg->SetFillColor(0);
+  gr_running_avg->GetXaxis()->SetTitle("ai [cm]");
+  gr_running_avg->GetYaxis()->SetTitle("#PE/f (eta)");
 
   gr_qincone_ai = new TGraph();
   gr_qincone_ai->SetLineWidth(0);
@@ -497,6 +513,22 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
     pehits_file << "##partfile,max_cluster_hits,max_cluster_charge" << std::endl;
   }
 
+  lravg_file.open("left_right_avg.txt", std::ostream::app);
+  if (!lravg_file)
+  {
+    std::cout << " [debug] left_right_avg.txt does not exist! Creating now..." << std::endl;
+    lravg_file.open("left_right_avg.txt");
+    lravg_file << "##partfile,left_avg,right_avg" << std::endl;
+  }
+
+/*  lravg_file.open("true_track_length.txt", std::ostream::app);
+  if (!lravg_file)
+  {
+    std::cout << " [debug] left_right_avg.txt does not exist! Creating now..." << std::endl;
+    lravg_file.open("true_track_length.txt");
+    lravg_file << "##partfile,truetracklength" << std::endl;
+  }*/
+
   if (verbosity > 2) std::cout << "MuonFitter Tool: Initialization complete" << std::endl;
 
   return true;
@@ -529,6 +561,13 @@ bool MuonFitter::Execute(){
   gr_effarea_ai->Set(0);
   gr_fpmt_ai->Set(0);
   gr_eta_ai->Set(0);
+  gr_running_avg->Set(0);
+
+  avg_eta = 0;
+  left_avg_eta = 0.;
+  right_avg_eta = 0.;
+  num_left_eta = 0;
+  num_right_eta = 0;
 
 
   // --------------------------------------------------
@@ -581,7 +620,7 @@ bool MuonFitter::Execute(){
 
     double trueAngleRad = TMath::ACos(trueDirZ);
     trueAngle = trueAngleRad/(TMath::Pi()/180.);
-    //h_truevtx_angle->Fill(trueAngle);
+    h_truevtx_angle->Fill(trueAngle);
 
     RecoVertex *truestopvtx = 0;
     get_ok = m_data->Stores["RecoEvent"]->Get("TrueStopVertex", truestopvtx);
@@ -1044,7 +1083,7 @@ bool MuonFitter::Execute(){
     std::vector<double> x_hits, y_hits, z_hits;
     double cluster_charge = 0.;   //TODO:make cluster or individual PMT charge cut?
 
-    // CALCULATE ai FOR EACH PMT METHOD
+    // METHOD: CALCULATE ai FOR EACH PMT
     std::map<unsigned long, double> charge;
     std::map<int, std::vector<double>> m_PE_ai;
     std::map<int, std::vector<double>> m_fpmt_ai;
@@ -1080,16 +1119,39 @@ bool MuonFitter::Execute(){
           x_hits.push_back(hitX);
           y_hits.push_back(hitY);
           z_hits.push_back(hitZ);
-          Direction dirPMT = this_detector->GetDetectorDirection();
-          TVector3 pmt_dir = TVector3(dirPMT.X()*100., dirPMT.Y()*100., dirPMT.Z()*100.).Unit();
+          //Direction dirPMT = this_detector->GetDetectorDirection();
+          //TVector3 pmt_dir = TVector3(dirPMT.X()*100., dirPMT.Y()*100., dirPMT.Z()*100.).Unit();
 
           // keep track of total charge seen by each PMT
           charge[detkey] += hit_PE;
+        } //end if ChannelKetToSPEMap; TEST PE CUT
+      } //end cluster_hits_MC loop; TEST PE CUT
 
-          // select MC muons that are basically traveling straight ahead
-          //if (trueAngle < -10. || trueAngle > 10.) continue;
-          h_truevtx_angle->Fill(trueAngle);
 
+      int i = 0;    //index for TGraph
+      for (unsigned long detkey = 332; detkey < 464; ++detkey)
+      {
+          //PE CUT
+          //NOTE: there will be PMTs w/ 0 charge from initialization of charge map
+          if (charge[detkey] == 0) continue;
+
+          double hit_PE = charge[detkey];
+          if (charge[detkey] < PMTQCut)
+          {
+            std::cout << " [debug] SKIPPING charge[" << detkey << "] < " << PMTQCut << "pe: " << charge[detkey] << std::endl;
+            //std::cout << " [debug] JK setting charge to 0" << std::endl;
+            hit_PE = 0.;
+            continue;
+          }
+
+          double hitX = x_pmt[detkey];
+          double hitY = y_pmt[detkey];
+          double hitZ = z_pmt[detkey];
+          double dirPMTX = x_pmt_dir[detkey];
+          double dirPMTY = y_pmt_dir[detkey];
+          double dirPMTZ = z_pmt_dir[detkey];
+          
+          TVector3 pmt_dir = TVector3(dirPMTX, dirPMTY, dirPMTZ).Unit();
 
           // get vector from tankExitPoint to PMT (Ri)
           TVector3 vec_Ri = TVector3(hitX,hitY,hitZ) - TVector3(tankExitPointX,tankExitPointY,tankExitPointZ);
@@ -1122,7 +1184,7 @@ bool MuonFitter::Execute(){
           //if (anglePmtTrueVtx > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(hit_PE);
 
           // loop through all hits for this ai and determine whether in/out cone
-          double qInCone = 0., qOutCone = 0.;
+/*          double qInCone = 0., qOutCone = 0.;
           for (int j = 0; j < (int)cluster_hits_MC.size(); ++j)
           {
             //for each hit
@@ -1131,10 +1193,10 @@ bool MuonFitter::Execute(){
             if (it != ChannelKeyToSPEMap.end())
             {
               Detector* this_detector = geom->ChannelToDetector(chankey);
-             unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
+              unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
               Position det_pos = this_detector->GetDetectorPosition();
               double hit_PE = cluster_hits_MC.at(j).GetCharge();  //in PE
-              double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
+              //double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
               double hit_time = cluster_hits_MC.at(j).GetTime();
               double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
               double hitY = 100.*(det_pos.Y()-tank_center_y);   //[cm]
@@ -1148,7 +1210,7 @@ bool MuonFitter::Execute(){
             }
           }
           gr_qincone_ai->SetPoint(i, ai, qInCone);
-          gr_qoutcone_ai->SetPoint(i, ai, qOutCone);
+          gr_qoutcone_ai->SetPoint(i, ai, qOutCone); */
 
           // get angle btwn vector bi and pmt dir
           double psi = vec_bi.Angle(-pmt_dir);
@@ -1182,7 +1244,7 @@ bool MuonFitter::Execute(){
 
 
           //XXX: checking PMT direction by drawing sphere in front of PMT
-          TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
+/*          TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
           if (detkey == 400)
           {
             // tankExit
@@ -1205,11 +1267,14 @@ bool MuonFitter::Execute(){
             bBlock->SetLineColor(9);
             EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(vec_bi.X()+vec_ai.X(), vec_bi.Y()+vec_ai.Y(), vec_bi.Z()+vec_ai.Z()));
             N++;
-          } //end if detkey==400
+          } //end if detkey==400 */
 
-        } //end if ChannelKeytoSPEMap
-      } //end for loop thru cluster hits
-    } //end if going thru cluster 1x
+          ++i;
+        } //end charge[detkey] loop; TEST PE CUT
+
+    //    } //end if ChannelKeytoSPEMap; COMMENTED OUT FOR TEST PE CUT
+    //  } //end for loop thru cluster hits; COMMENTED OUT FOR TEST PE CUT
+    } //end is MC
 
     // find which pmt charges are inside/outside cone of true track direction
     for (unsigned long detkey = 332; detkey < 464; ++detkey)
@@ -1232,8 +1297,85 @@ bool MuonFitter::Execute(){
       }
     }
 
+    // Make graph of eta vs ai (tank track length)
+    int j = 0;
+    double running_avg = 0;
+    bool found_vtx = false;
+    for (auto const &pair: m_fpmt_ai)
+    {
+      double total_PE_ai = 0;
+      double total_fpmt_ai = 0;
+      for (int e = 0; e < pair.second.size(); ++e)
+      {
+        total_fpmt_ai += pair.second.at(e);
+        total_PE_ai += m_PE_ai[pair.first].at(e);
+      }
+      double total_eta = total_PE_ai / total_fpmt_ai;
+      if (total_eta > max_eta) max_eta = total_eta;
+      
+      gr_eta_ai->SetPoint(j, pair.first, total_eta);
+      avg_eta += total_eta;
+      
+      if (j == 0) running_avg = avg_eta;
+      else
+      {
+        running_avg = avg_eta / j;
+
+        if (running_avg < EtaThreshold && !found_vtx)
+        {
+          // first instance the avg dips below threshold
+          std::cout << " [debug] BEST VERTEX (ai): " << pair.first << std::endl;
+          found_vtx = true;
+          bestFitAi = pair.first;
+        }
+      }
+
+      std::cout << " [debug] ai, running_avg: " << pair.first << ", " << running_avg << std::endl;
+      std::cout << " [debug] EtaThreshold: " << EtaThreshold << std::endl;
+      gr_running_avg->SetPoint(j, pair.first, running_avg);
+
+      if (pair.first < trueRecoTankTrackLength)   //left of true track length
+      {
+        std::cout << " [debug] total_eta (left): " << total_eta << std::endl;
+        num_left_eta++;
+        left_avg_eta += total_eta;
+      }
+      if (pair.first > trueRecoTankTrackLength)   //right of true track length
+      {
+        std::cout << " [debug] total_eta (right): " << total_eta << std::endl;
+        num_right_eta++;
+        right_avg_eta += total_eta;
+      }
+      j+=1;
+    }
+    avg_eta /= j;
+    std::cout << " [debug] num pmts (left, right): " << num_left_eta << ", " << num_right_eta << std::endl;
+    if (num_left_eta != 0) left_avg_eta /= num_left_eta;
+    if (num_right_eta != 0) right_avg_eta /= num_right_eta;
+    std::cout << " [debug] left avg: " << left_avg_eta << ", right avg: " << right_avg_eta << std::endl;
+    std::cout << " [debug] avg eta: " << avg_eta << ", j: " << j << std::endl;
+    h_avg_eta->Fill(avg_eta);
+    h_lr_avg_eta->Fill(left_avg_eta);
+    h_lr_avg_eta->Fill(right_avg_eta);
+
+    // running avg of entire graph
+    // this might just be smoothing...
+    for (int e = 1; e < j-2; ++e)
+    {
+      double three_pt_avg = (gr_eta_ai->GetY()[e-1] + gr_eta_ai->GetY()[e] + gr_eta_ai->GetY()[e+1]) / 3.;
+      //gr_running_avg->SetPoint(e-1, gr_eta_ai->GetX(e), three_pt_avg);
+    }
+
+    // save to txt files
+    lravg_file << "p" << partnumber << "_";
+    if (isData) lravg_file << evnum;
+    else lravg_file << mcevnum;
+    lravg_file << "," << left_avg_eta << "," << right_avg_eta << std::endl;
+    //lravg_file << "," << trueRecoTankTrackLength << std::endl;
+
+
   
-    // STEPPING BACK VTX CANDIDATES METHOD
+    // METHOD: STEPPING BACK FROM TANKEXITPT FOR VTX CANDIDATES
     std::map<int, double> m_vtx_charge_incone;   //map of total charge seen at ea vtx candidate
     std::map<int, double> m_vtx_charge_per_pmt_incone;
     std::map<int, double> m_vtx_detkey_incone;
@@ -1405,22 +1547,6 @@ bool MuonFitter::Execute(){
         } //done looping through cluster hits for this vtx c
       } //end isData/isMC
 
-      // Make graph of eta vs ai (tank track length)
-      for (auto const &pair: m_fpmt_ai)
-      {
-        double total_PE_ai = 0;
-        double total_fpmt_ai = 0;
-        for (int e = 0; e < pair.second.size(); ++e)
-        {
-          total_fpmt_ai += pair.second.at(e);
-          total_PE_ai += m_PE_ai[pair.first].at(e);
-        }
-        double total_eta = total_PE_ai / total_fpmt_ai;
-        if (total_eta > max_eta) max_eta = total_eta;
-        
-        gr_eta_ai->SetPoint(pair.first, pair.first, total_eta);
-      }
-
       // INSIDE cone at each vtx
       double tot_charge_incone = 0;
       for (int q = 0; q < v_charges_incone.size(); ++q) { tot_charge_incone += v_charges_incone.at(q); }
@@ -1546,10 +1672,11 @@ bool MuonFitter::Execute(){
       max_vtx_charge = X->second;
       std::cout << " Max charge using max_element method: " << max_vertex << ", " << max_vtx_charge << std::endl;
 
+      //TODO: find bestVtx
       TVector3 bestVtx(vtxCandidates.at(max_vertex).X(), vtxCandidates.at(max_vertex).Y(), vtxCandidates.at(max_vertex).Z());
       double tankTrackLength = TMath::Sqrt(pow(mrdStart.X()-bestVtx.X(),2) + pow(mrdStart.Y()-bestVtx.Y(),2) + pow(mrdStart.Z()-bestVtx.Z(),2));
       //std::cout << " [debug] tankTrackLength: " << tankTrackLength << std::endl;
-      h_tank_track_len->Fill(tankTrackLength);
+      h_fitted_tank_track_len->Fill(tankTrackLength);
       double distClosestApproach = TMath::Sqrt(pow(bestVtx.X()-tank_center_x,2) + pow(bestVtx.Y()-tank_center_y,2) + pow(bestVtx.Z()-tank_center_z,2));
       h_closest_approach->Fill(distClosestApproach);
 
@@ -1705,7 +1832,7 @@ bool MuonFitter::Execute(){
     legend1->AddEntry(gr_vtx_charge_in, "inside cone", "lp");
     legend1->AddEntry(gr_vtx_charge_out, "outside cone", "lp");
     legend1->Draw();
-    c_vtx_charge->Write();
+    //c_vtx_charge->Write();
 
     // Charge per PMT
     c_charge_per_pmt->cd();
@@ -1798,7 +1925,7 @@ bool MuonFitter::Execute(){
     c_effarea_detkey->Update();
     c_effarea_detkey->SetTitle(ss_effarea_title.str().c_str());
     c_effarea_detkey->SetName(ss_effarea_name.str().c_str());
-    c_effarea_detkey->Write();
+    //c_effarea_detkey->Write();
 
     c_fpmt_detkey->cd();
     std::stringstream ss_fpmt_title, ss_fpmt_name;
@@ -1819,7 +1946,7 @@ bool MuonFitter::Execute(){
     c_fpmt_detkey->Update();
     c_fpmt_detkey->SetTitle(ss_fpmt_title.str().c_str());
     c_fpmt_detkey->SetName(ss_fpmt_name.str().c_str());
-    c_fpmt_detkey->Write();
+    //c_fpmt_detkey->Write();
 
     c_effarea_ai->cd();
     std::stringstream ss_effarea_ai_name;
@@ -1862,8 +1989,8 @@ bool MuonFitter::Execute(){
     c_fpmt_ai->Write();
 
     c_eta_ai->cd();
-    std::stringstream ss_eta_title, ss_eta_ai_name;
-    ss_eta_title << "#PE Divided by f (eta) Ev_";
+    std::stringstream ss_eta_title, ss_eta_ai_name, ss_truetrack;
+    ss_eta_title << "Eta: #PE Divided by f (tot PMT charge > " << PMTQCut << ") Ev_";
     ss_eta_ai_name << "c_eta_ai_p" << partnumber << "_ev";
     if (isData)
     {
@@ -1874,27 +2001,59 @@ bool MuonFitter::Execute(){
     {
       ss_eta_title << mcevnum;
       ss_eta_ai_name << mcevnum;
+      ss_truetrack << "true track: " << trueRecoTankTrackLength << " cm";
+      //gr_eta_ai->SetTitle(ss_truetrack.str().c_str());
     }
     gr_eta_ai->Draw("alp");
-    gr_qincone_ai->Draw("lp");
-    gr_qoutcone_ai->Draw("lp");
+    gr_running_avg->Draw("lp");
+    //gr_qincone_ai->Draw("lp");
+    //gr_qoutcone_ai->Draw("lp");
     c_eta_ai->Modified();
     c_eta_ai->Update();
     c_eta_ai->SetTitle(ss_eta_title.str().c_str());
     c_eta_ai->SetName(ss_eta_ai_name.str().c_str());
+
+    TLegend *legend4 = new TLegend(0.55, 0.65, 0.89, 0.89);
+    legend4->AddEntry(gr_eta_ai, "eta", "lp");
+    //legend4->AddEntry(gr_qincone_ai, "inside cone", "lp");
+    //legend4->AddEntry(gr_qoutcone_ai, "outside cone", "lp");
+    legend4->AddEntry(gr_running_avg, "running avg eta", "lp");
+
+    TLine *lBestFitAi = new TLine(bestFitAi, 0, bestFitAi, max_eta+1);
+    lBestFitAi->SetLineColor(2);
+    lBestFitAi->SetLineWidth(2);
+    //lBestFitAi->Draw();
+    //legend4->AddEntry(lBestFitAi, "best fit", "l");
     if (!isData)
     { //indicate distance btwn trueVtx and tankExitPoint
-      TLine *lTrueTankTrack = new TLine(trueRecoTankTrackLength, 0, trueRecoTankTrackLength, max_eta+50);
+      TLine *lTrueTankTrack = new TLine(trueRecoTankTrackLength, 0, trueRecoTankTrackLength, max_eta+1);
       lTrueTankTrack->SetLineColor(4);
       lTrueTankTrack->SetLineWidth(2);
-      lTrueTankTrack->Draw();
+      //lTrueTankTrack->Draw();
+      //legend4->AddEntry(lTrueTankTrack, "true tank track length", "l");
+
+      TLine *lLeftAvgEta = new TLine(55, left_avg_eta, trueRecoTankTrackLength, left_avg_eta);
+      lLeftAvgEta->SetLineColor(46);
+      lLeftAvgEta->SetLineWidth(2);
+      //lLeftAvgEta->Draw();
+      //legend4->AddEntry(lLeftAvgEta, "avg eta left of true track length", "l");
+
+      TLine *lRightAvgEta = new TLine(trueRecoTankTrackLength, right_avg_eta, 450, right_avg_eta);
+      lRightAvgEta->SetLineColor(8);
+      lRightAvgEta->SetLineWidth(2);
+      //lRightAvgEta->Draw();
+      //legend4->AddEntry(lRightAvgEta, "avg eta right of true track length", "l");
+
+      TLine *lAvgEta = new TLine(55, avg_eta, 450, avg_eta);
+      lAvgEta->SetLineColor(5);
+      lAvgEta->SetLineWidth(2);
+      lAvgEta->Draw();
+      legend4->AddEntry(lAvgEta, "avg eta", "l");
     }
-    TLegend *legend4 = new TLegend(0.7, 0.8, 0.9, 0.9);
-    legend4->AddEntry(gr_eta_ai, "eta", "lp");
-    legend4->AddEntry(gr_qincone_ai, "inside cone", "lp");
-    legend4->AddEntry(gr_qoutcone_ai, "outside cone", "lp");
     legend4->Draw();
     c_eta_ai->Write();
+    ss_eta_ai_name << ".png";
+    c_eta_ai->SaveAs(ss_eta_ai_name.str().c_str());
   }
 
   return true;
@@ -1908,15 +2067,15 @@ bool MuonFitter::Finalise(){
   h_expected_PE->Write();
   h_phot_inc_angle->Write();
   h_hit_angles->Write();
-  h_tank_track_len->Write();
+  h_fitted_tank_track_len->Write();
   h_closest_approach->Write();
-  h_num_mrd_layers->Write();
-  h_clusterhit_x->Write();
-  h_clusterhit_y->Write();
-  h_clusterhit_z->Write();
-  h_clusterhit_detkey->Write();
-  h_clusterhit_timespread->Write();
-  h_clusterhit_time->Write();
+  //h_num_mrd_layers->Write();
+  //h_clusterhit_x->Write();
+  //h_clusterhit_y->Write();
+  //h_clusterhit_z->Write();
+  //h_clusterhit_detkey->Write();
+  //h_clusterhit_timespread->Write();
+  //h_clusterhit_time->Write();
   if (!isData)
   {
     h_lastvtx_z->Write();
@@ -1927,10 +2086,10 @@ bool MuonFitter::Finalise(){
   h_tanktrack_ai->Write();
   h_eff_area_pmt->Write();
   h_fpmt->Write();
-  h_eta_ai->Write();
+  //h_eta_ai->Write();
   h_qincone_truevtx->Write();
   h_qoutcone_truevtx->Write();
-  h_total_pe_hits->Write();
+  //h_total_pe_hits->Write();
   h_truevtx_recoexit_track->Write();
   h_pmt_charge->Write();
 
@@ -1955,6 +2114,7 @@ bool MuonFitter::Finalise(){
   //pos_file.close();
   //cpp_file.close();
   pehits_file.close();
+  lravg_file.close();
 
   Log("MuonFitter Tool: Exiting", v_message, verbosity);
   return true;

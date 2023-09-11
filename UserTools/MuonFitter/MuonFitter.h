@@ -86,11 +86,16 @@ class MuonFitter: public Tool {
     double deltaL = 0.;
     double insideAngle = -5.;
     double outsideAngle = 5.;
+    double PMTQCut = 3.;
+    double EtaThreshold = 500.;
 
+    //text files
     std::ofstream pos_file;
     std::ofstream cpp_file;
     std::ofstream pehits_file;
+    std::ofstream lravg_file;
 
+    //root,plots
     TFile *root_outp = nullptr;
     TCanvas *canvas_3d;
     TCanvas *canvas_vtxq;
@@ -106,7 +111,6 @@ class MuonFitter: public Tool {
     TCanvas *canvas_ev_display; //test saving of ev displays
     std::map<uint32_t, TCanvas *> m_evdisplays;
 
-    //plots
     TGraph *gr_vtx_charge_in = nullptr;
     TGraph *gr_vtx_charge_out = nullptr;
     TGraph *gr_qdensity_in = nullptr;
@@ -120,11 +124,12 @@ class MuonFitter: public Tool {
     TGraph *gr_eta_ai = nullptr;
     TGraph *gr_qincone_ai = nullptr;
     TGraph *gr_qoutcone_ai = nullptr;
+    TGraph *gr_running_avg = nullptr;
     TH1D *h_alpha = nullptr;
     TH1D *h_expected_PE = nullptr;
     TH1D *h_phot_inc_angle = nullptr;
     TH1D *h_hit_angles = nullptr;
-    TH1D *h_tank_track_len = nullptr;
+    TH1D *h_fitted_tank_track_len = nullptr;
     TH1D *h_closest_approach = nullptr;
     TH1D *h_num_mrd_layers = nullptr;
     TH1D *h_truevtx_z = nullptr;
@@ -147,6 +152,8 @@ class MuonFitter: public Tool {
     TH1D *h_truevtx_recoexit_track = nullptr;
     TH1D *h_truevtx_trueexit_track = nullptr;
     TH1D *h_pmt_charge = nullptr;
+    TH1D *h_lr_avg_eta = nullptr;
+    TH1D *h_avg_eta = nullptr;
 
     //event variables
     int partnumber;
@@ -220,6 +227,13 @@ class MuonFitter: public Tool {
     double energyLossError = 0.;
     double mrdStartTime = -69.;
 
+    //misc
+    double avg_eta;
+    double left_avg_eta;
+    double right_avg_eta;
+    int num_left_eta;
+    int num_right_eta;
+    double bestFitAi = 0;
 };
 
 
