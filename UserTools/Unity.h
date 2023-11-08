@@ -174,3 +174,5 @@
 #include "FilterEvents.h"
 #include "Stage1DataBuilder.h"
 #include "BeamFetcherV2.h"
+#include "SaveConfigInfo.h"
+#include "ReadConfigInfo.h"

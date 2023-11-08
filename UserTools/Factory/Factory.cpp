@@ -164,6 +164,8 @@ if (tool=="FilterLAPPDEvents") ret=new FilterLAPPDEvents;
 if (tool=="FilterEvents") ret=new FilterEvents;
 if (tool=="Stage1DataBuilder") ret=new Stage1DataBuilder;
 if (tool=="BeamFetcherV2") ret=new BeamFetcherV2;
+if (tool=="SaveConfigInfo") ret=new SaveConfigInfo;
+if (tool=="ReadConfigInfo") ret=new ReadConfigInfo;
 if (tool=="InteractiveEvDisplay") ret=new InteractiveEvDisplay;
 return ret;
 }
