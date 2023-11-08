@@ -1,4 +1,3 @@
-//TODO:consider renaming tool to TankEnergyEstimator/EnergyEstimator?
 #include "MuonFitter.h"
 
 MuonFitter::MuonFitter():Tool(){}
@@ -38,16 +37,22 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("OutsideAngle", outsideAngle);
   m_variables.Get("PMTChargeThreshold", PMTQCut);
   m_variables.Get("EtaThreshold", EtaThreshold);
+  m_variables.Get("DisplayTruth", display_truth);
+  m_variables.Get("FitMode", fit_mode);
+  m_variables.Get("TankTrackFitFile", tankTrackFitFile);
 
-  // Files
+
+  // Output ROOT file
   std::string outfile;
   m_variables.Get("OutputFile", outfile);
   Log("MuonFitter Tool: Saving output into " + outfile, v_message, verbosity);
   root_outp = new TFile(outfile.c_str(), "RECREATE");
 
+
   // --------------------------------------------------
   // --- Initialize canvases, graphs, histograms ------
   // --------------------------------------------------
+  // Canvases
   c_vtx_charge = new TCanvas("c_vtx_charge", "Total Charge Seen at Each Vertex", 800, 600);
   c_vtx_detkey = new TCanvas("c_vtx_detkey", "Num of PMTs In/Out Cone at Each Vertex", 800, 600);
   c_charge_per_pmt = new TCanvas("c_charge_per_pmt", "Charge Per PMT at Each Vertex", 800, 600);
@@ -56,7 +61,9 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   c_effarea_ai = new TCanvas("c_effarea_ai", "Effective PMT Area vs ai (tank track)", 800, 600);
   c_fpmt_ai = new TCanvas("c_fpmt_ai", "Effective PMT Area as Fraction of Frustum Area", 800, 600);
   c_eta_ai = new TCanvas("c_eta_ai", "Charge per cm (eta)", 800, 600);
+  c_h_tzero = new TCanvas("c_h_tzero", "t0", 800, 600);
 
+  // Histograms
   h_alpha = new TH1D("h_alpha", "Alpha Value Distribution", 10, 0., 10.);
   h_alpha->GetXaxis()->SetTitle("alpha_i (x1e3)");   //TODO:latex
 
@@ -69,7 +76,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_hit_angles = new TH1D("h_hit_angles", "Hit Angles wrt Vertex and MRD Track Dir", 180, 0., 180.);
   h_hit_angles->GetXaxis()->SetTitle("hit angle [deg]");
 
-  h_fitted_tank_track_len = new TH1D("h_fitted_tank_track_len", "Length of Tank Tracks", 500, 0., 500.);
+  h_fitted_tank_track_len = new TH1D("h_fitted_tank_track_len", "Length of Fitted Tank Tracks", 500, 0., 500.);
   h_fitted_tank_track_len->GetXaxis()->SetTitle("track length [cm]");
 
   h_closest_approach = new TH1D("h_closest_approach", "Distance of Closest Approach (Btwn Vtx & Tank Ctr)", 500, 0., 500.);
@@ -78,8 +85,8 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_num_mrd_layers = new TH1D("h_num_mrd_layers", "Num MRD Layers Hit", 50, 0, 50.);
   h_num_mrd_layers->GetXaxis()->SetTitle("# layers");
   
-  h_truevtx_z = new TH1D("h_truevtx_z", "Z coordinate of True Vertex", 300, -150., 150.);
-  h_truevtx_z->GetXaxis()->SetTitle("Z [cm]");
+  //h_truevtx_z = new TH1D("h_truevtx_z", "Z coordinate of True Vertex", 300, -150., 150.);
+  //h_truevtx_z->GetXaxis()->SetTitle("Z [cm]");
 
   h_lastvtx_z = new TH1D("h_lastvtx_z", "Z coordinate of Last Candidate Vertex", 300, -150., 150.);
   h_lastvtx_z->GetXaxis()->SetTitle("Z [cm]");
@@ -111,9 +118,9 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_fpmt = new TH1D("h_fpmt", "area fraction f", 100, 0., 1.);
   h_fpmt->GetXaxis()->SetTitle("f");
 
-  h_eta_ai = new TH2D("h_eta_ai", "#PE/f vs. Tank Track Length", 50, 0., 500., 500, 0., 5000.);
+  h_eta_ai = new TH2D("h_eta_ai", "#eta vs. Tank Track Length", 50, 0., 500., 500, 0., 5000.);
   h_eta_ai->GetXaxis()->SetTitle("ai [cm]");
-  h_eta_ai->GetYaxis()->SetTitle("#PE/f");
+  h_eta_ai->GetYaxis()->SetTitle("#eta [nPE/f]");
 
   h_clusterhit_timespread = new TH1D("h_clusterhit_timespread", "Time Spread of Clusters (Latest - Earliest)", 200, 0, 200);
   h_clusterhit_timespread->GetXaxis()->SetTitle("latest t - earliest t [ns]");
@@ -131,22 +138,90 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_total_pe_hits->GetXaxis()->SetTitle("# hits");
   h_total_pe_hits->GetYaxis()->SetTitle("# PE");
 
+  h_charge_detkey = new TH2D("h_charge_detkey", "Total PE vs PMT detkey", 134, 331, 465, 500, 0., 1000.);
+  h_charge_detkey->GetXaxis()->SetTitle("detkey");
+  h_charge_detkey->GetYaxis()->SetTitle("nPE");
+
   h_truevtx_recoexit_track = new TH1D("h_truevtx_recoexit_track", "Tank Track Length (true vertex to reco tank exit)", 350, 0, 350);
   h_truevtx_recoexit_track->GetXaxis()->SetTitle("track length [cm]");
 
   h_truevtx_trueexit_track = new TH1D("h_truevtx_trueexit_track", "Tank Track Length (true vertex to true tank exit)", 350, 0, 350);
   h_truevtx_trueexit_track->GetXaxis()->SetTitle("track length [cm]");
 
-  h_pmt_charge = new TH1D("h_pmt_charge", "Total Charge Seen By PMT", 500, 0, 500);
+  h_pmt_charge = new TH1D("h_pmt_charge", "Total Charge Seen By PMT In A Cluster", 500, 0, 1000);
   h_pmt_charge->GetXaxis()->SetTitle("charge [pe]");
 
-  h_lr_avg_eta = new TH1D("h_lr_avg_eta", "Avg Eta to Left/Right of True Tank Track Length", 100, 0, 5000);
+  h_lr_avg_eta = new TH1D("h_lr_avg_eta", "Avg #eta to Left/Right of True Tank Track Length", 100, 0, 5000);
   h_lr_avg_eta->GetXaxis()->SetTitle("eta [PE/cm]");
 
   h_avg_eta = new TH1D("h_avg_eta", "Overall Average Eta", 100, 0, 5000);
   h_avg_eta->GetXaxis()->SetTitle("eta [PE/cm]");
 
+  h_truefitdiff_x = new TH1D("h_truefitdiff_x", "Fitted Vertex - True Vertex (X)", 300, -150., 150.);
+  h_truefitdiff_x->GetXaxis()->SetTitle("diff (fit-true) [cm]");
 
+  h_truefitdiff_y = new TH1D("h_truefitdiff_y", "Fitted Vertex - True Vertex (Y)", 300, -150., 150.);
+  h_truefitdiff_y->GetXaxis()->SetTitle("diff (fit-true) [cm]");
+
+  h_truefitdiff_z = new TH1D("h_truefitdiff_z", "Fitted Vertex - True Vertex (Z)", 300, -150., 150.);
+  h_truefitdiff_z->GetXaxis()->SetTitle("diff (fit-true) [cm]");
+
+  h_tdiff = new TH1D("h_tdiff", "Time Residuals", 1000, -1000., 1000.);
+  h_tdiff->GetXaxis()->SetTitle("time residual [ns]");
+
+  h_uber_t0widths = new TH1D("h_uber_t0widths", "Distribution of Timing Distribution Widths", 31, -1., 30.);
+  h_uber_t0widths->GetXaxis()->SetTitle("std devs [ns]");
+
+  h_true_tanktrack_len = new TH1D("h_true_tanktrack_len", "Distribution of True Track Lengths", 250, 0, 500);
+  h_true_tanktrack_len->GetXaxis()->SetTitle("track length [cm]");
+
+  h_fitted_track_len = new TH1D("h_fitted_track_len", "Distribution of Fitted Track Length", 200, 0, 400);
+  h_fitted_track_len->GetXaxis()->SetTitle("track length [cm]");
+
+  h_truefit_len_diff = new TH1D("h_truefit_len_diff", "Difference in Fitted and True Track Lengths", 100, 0, 200);
+  h_truefit_len_diff->GetXaxis()->SetTitle("abs(fit-truth) [cm]");
+
+  h_vtxfit_x = new TH1D("h_vtxfit_x", "Fitted Vertex X", 60, -150., 150.);
+  h_vtxfit_x->GetXaxis()->SetTitle("x [cm]");
+
+  h_vtxfit_y = new TH1D("h_vtxfit_y", "Fitted Vertex Y", 60, -150., 150.);
+  h_vtxfit_y->GetXaxis()->SetTitle("y [cm]");
+
+  h_vtxfit_z = new TH1D("h_vtxfit_z", "Fitted Vertex Z", 60, -150., 150.);
+  h_vtxfit_z->GetXaxis()->SetTitle("z [cm]");
+
+  h_truevtx_x = new TH1D("h_truevtx_x", "True Vertex X", 60, -150., 150.);
+  h_truevtx_x->GetXaxis()->SetTitle("x [cm]");
+
+  h_truevtx_y = new TH1D("h_truevtx_y", "True Vertex Y", 60, -150., 150.);
+  h_truevtx_y->GetXaxis()->SetTitle("y [cm]");
+
+  h_truevtx_z = new TH1D("h_truevtx_z", "True Vertex Z", 60, -150., 150.);
+  h_truevtx_z->GetXaxis()->SetTitle("z [cm]");
+
+  h_topview_fit = new TH2D("h_topview_fit", "Distributions of FITTED Vertices in Tank (Top View)", 60, -150., 150., 60, -150., 150.);
+  h_topview_fit->GetXaxis()->SetTitle("Z [cm]");
+  h_topview_fit->GetYaxis()->SetTitle("X [cm]");
+
+  h_topview_truth = new TH2D("h_topview_truth", "Distributions of TRUTH Vertices in Tank (Top View)", 60, -150., 150., 60, -150., 150.);
+  h_topview_truth->GetXaxis()->SetTitle("Z [cm]");
+  h_topview_truth->GetYaxis()->SetTitle("X [cm]");
+
+  h_sideview_fit = new TH2D("h_sideview_fit", "Distributions of FITTED Vertices in Tank (Side View)", 60, -150., 150., 60, -150., 150.);
+  h_sideview_fit->GetXaxis()->SetTitle("Z [cm]");
+  h_sideview_fit->GetYaxis()->SetTitle("Y [cm]");
+
+  h_sideview_truth = new TH2D("h_sideview_truth", "Distributions of TRUTH Vertices in Tank (Side View)", 60, -150., 150., 60, -150., 150.);
+  h_sideview_truth->GetXaxis()->SetTitle("Z [cm]");
+  h_sideview_truth->GetYaxis()->SetTitle("Y [cm]");
+
+  h_deltaR = new TH1D("h_deltaR", "#Delta r", 75, 0., 150.);
+  h_deltaR->GetXaxis()->SetTitle("#Delta r [cm]");
+
+
+  // Graphs
+
+  // Graphs
   // total charge at ea vtx
   gr_vtx_charge_in = new TGraph();
   //gr_vtx_charge_in->SetName("gr_vtx_charge_in");
@@ -212,7 +287,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_effarea_detkey->SetMarkerColor(38);
   gr_effarea_detkey->SetFillColor(0);
   gr_effarea_detkey->GetXaxis()->SetTitle("detkey");
-  gr_effarea_detkey->GetYaxis()->SetTitle("effective PMT area [cm2]");
+  gr_effarea_detkey->GetYaxis()->SetTitle("effective PMT area [cm^{2}]");
 
   gr_fpmt_detkey = new TGraph();
   gr_fpmt_detkey->SetLineWidth(0);
@@ -227,15 +302,15 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_effarea_ai->SetMarkerStyle(25);
   gr_effarea_ai->SetMarkerColor(40);
   gr_effarea_ai->SetFillColor(0);
-  gr_effarea_ai->GetXaxis()->SetTitle("ai [cm]");
-  gr_effarea_ai->GetYaxis()->SetTitle("effective PMT area [cm2]");
+  gr_effarea_ai->GetXaxis()->SetTitle("a_{i} [cm]");
+  gr_effarea_ai->GetYaxis()->SetTitle("effective PMT area [cm^{2}]");
 
   gr_fpmt_ai = new TGraph();
   gr_fpmt_ai->SetLineWidth(0);
   gr_fpmt_ai->SetMarkerStyle(27);
   gr_fpmt_ai->SetMarkerColor(30);
   gr_fpmt_ai->SetFillColor(0);
-  gr_fpmt_ai->GetXaxis()->SetTitle("ai [cm]");
+  gr_fpmt_ai->GetXaxis()->SetTitle("a_{i} [cm]");
   gr_fpmt_ai->GetYaxis()->SetTitle("f");
 
   gr_eta_ai = new TGraph();
@@ -243,16 +318,16 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_eta_ai->SetMarkerStyle(25);
   gr_eta_ai->SetMarkerColor(46);
   gr_eta_ai->SetFillColor(0);
-  gr_eta_ai->GetXaxis()->SetTitle("ai [cm]");
-  gr_eta_ai->GetYaxis()->SetTitle("#PE/f (eta)");
+  gr_eta_ai->GetXaxis()->SetTitle("a_{i} [cm]");
+  gr_eta_ai->GetYaxis()->SetTitle("#eta (nPE/f)");
 
   gr_running_avg = new TGraph();
   gr_running_avg->SetLineWidth(0);
   gr_running_avg->SetMarkerStyle(8);
   gr_running_avg->SetMarkerColor(38);
   gr_running_avg->SetFillColor(0);
-  gr_running_avg->GetXaxis()->SetTitle("ai [cm]");
-  gr_running_avg->GetYaxis()->SetTitle("#PE/f (eta)");
+  gr_running_avg->GetXaxis()->SetTitle("a_{i} [cm]");
+  gr_running_avg->GetYaxis()->SetTitle("#eta (nPE/f)");
 
   gr_qincone_ai = new TGraph();
   gr_qincone_ai->SetLineWidth(0);
@@ -271,17 +346,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   // --- Retrieve Store variables ---------------------
   // --------------------------------------------------
   m_data->CStore.Get("ChannelNumToTankPMTSPEChargeMap", ChannelKeyToSPEMap);  //same for data and mc
-  //m_data->CStore.Get("EventDisplay", canvas_ev_display);
-  //m_data->CStore.Get("EventDisplays", m_evdisplays);
 
-  // --------------------------------------------------
-  // --- Get Geometry ---------------------------------
-  // --------------------------------------------------
-  // --- Retrieve Store variables ---------------------
-  // --------------------------------------------------
-  m_data->CStore.Get("ChannelNumToTankPMTSPEChargeMap", ChannelKeyToSPEMap);  //same for data and mc
-  //m_data->CStore.Get("EventDisplay", canvas_ev_display);
-  //m_data->CStore.Get("EventDisplays", m_evdisplays);
 
   // --------------------------------------------------
   // --- Get Geometry ---------------------------------
@@ -314,6 +379,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   std::cout<<"  [debug] tank_center: "<<tank_center_x<<","<<tank_center_y<< ","<<tank_center_z<<std::endl;
   std::cout<<"  [debug] tank_radius: "<<tank_radius<<" m"<<std::endl;
   std::cout<<"  [debug] tank_height: "<<tank_height<<" m"<<std::endl;
+
 
   // --------------------------------------------------
   // --- ANNIE in 3D ----------------------------------
@@ -496,38 +562,69 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
     canvas_3d->Update();
   }
 
-  // Save start & stop vertices to file
-  std::string pos_fname = "posFile.txt";
+  // Save start & stop vertices to file; Save (ai,eta) values
+  //std::string pos_fname = "posFile.txt";
   //pos_file.open(pos_fname.c_str());
   //pos_file << "##evnum,startX,startY,startZ,stopX,stopY,stopZ" << std::endl;
+  std::string pos_fname = "ev_ai_eta.txt";
+  pos_file.open(pos_fname.c_str(), std::ostream::app);
+  if (!pos_file)
+  {
+    std::cout << "File " << pos_fname << " does not exist! Creating now.." << std::endl;
+    pos_file.open(pos_fname.c_str());
+    pos_file << "##ev_id,ai,eta" << std::endl;
+  }
 
-  std::string cpp_fname = "charge_per_pmt.txt";
+  // Save charge data to file
+  //std::string cpp_fname = "charge_per_pmt.txt";
   //cpp_file.open(cpp_fname.c_str());
   //cpp_file << "##evnum,nVtx,Qin,Qout,avgSumIn,avgSumOut,avgQin,avgQout" << std::endl;
 
-  pehits_file.open("tot_pe_hits.txt", std::ostream::app);
+  std::string pehits_fname = "tot_pe_hits.txt";
+  pehits_file.open(pehits_fname.c_str(), std::ostream::app);
   if (!pehits_file)
   {
-    std::cout << " [debug] tot_pe_hits.txt does not exist! Creating now..." << std::endl;
-    pehits_file.open("tot_pe_hits.txt");
-    pehits_file << "##partfile,max_cluster_hits,max_cluster_charge" << std::endl;
+    std::cout << "File " << pehits_fname << " does not exist! Creating now..." << std::endl;
+    pehits_file.open(pehits_fname.c_str());
+    pehits_file << "##partfile,main_cluster_hits,main_cluster_charge" << std::endl;
   }
 
-  lravg_file.open("left_right_avg.txt", std::ostream::app);
-  if (!lravg_file)
+  // Save avg eta to left and right of true tank track length
+  if (!isData && display_truth)
   {
-    std::cout << " [debug] left_right_avg.txt does not exist! Creating now..." << std::endl;
-    lravg_file.open("left_right_avg.txt");
-    lravg_file << "##partfile,left_avg,right_avg" << std::endl;
+    truetrack_file.open("true_track_len.txt", std::ostream::app);
+    if (!truetrack_file)
+    {
+      std::cout << " [debug] true_track_len.txt does not exist! Creating now..." << std::endl;
+      truetrack_file.open("true_track_len.txt");
+      truetrack_file << "#event_id,true_track_len,left_avg,right_avg" << std::endl;
+    }
   }
 
-/*  lravg_file.open("true_track_length.txt", std::ostream::app);
-  if (!lravg_file)
+  // Save fitted_track_len, nhits, nhits_incone to file
+  nhits_trlen_file.open("nhits_trlen.txt", std::ostream::app);
+  if (!nhits_trlen_file)
   {
-    std::cout << " [debug] left_right_avg.txt does not exist! Creating now..." << std::endl;
-    lravg_file.open("true_track_length.txt");
-    lravg_file << "##partfile,truetracklength" << std::endl;
-  }*/
+    std::cout << "File nhits_trlen.txt does not exist! Creating now..." << std::endl;
+    nhits_trlen_file.open("nhits_trlen.txt");
+    nhits_trlen_file << "##event_id,track_fit,nhits,nhits_incone,totalpe,totalpe_incone" << std::endl;
+  }
+
+  // Load vertex fits
+  if (fit_mode)
+  {
+    if (this->FileExists(tankTrackFitFile))
+    {
+      // Load event part, number and track fit
+      std::cout << "MuonFitter Tool: Loading tank track fits" << std::endl;
+      this->LoadTankTrackFits();
+    }
+    else
+    {
+      Log("MuonFitter Tool: File for tank track fit does not exist! Continuing tool not in fit mode.", v_error, verbosity);
+      fit_mode = false;
+    }
+  }
 
   if (verbosity > 2) std::cout << "MuonFitter Tool: Initialization complete" << std::endl;
 
@@ -562,6 +659,10 @@ bool MuonFitter::Execute(){
   gr_fpmt_ai->Set(0);
   gr_eta_ai->Set(0);
   gr_running_avg->Set(0);
+
+  if (h_tzero) h_tzero->Delete();
+  h_tzero = new TH1D("h_tzero", "t0?", 30, -15, 15);
+  h_tzero->GetXaxis()->SetTitle("[ns]");
 
   avg_eta = 0;
   left_avg_eta = 0.;
@@ -617,6 +718,8 @@ bool MuonFitter::Execute(){
     trueDirY = truevtx->GetDirection().Y();
     trueDirZ = truevtx->GetDirection().Z();
     trueTrackDir = TVector3(trueDirX,trueDirY,trueDirZ).Unit();
+    //TODO:double check true track direction doesn't change when .Unit()
+    //is it only the muon direction? what about neutrino, pion directions/vertices?
 
     double trueAngleRad = TMath::ACos(trueDirZ);
     trueAngle = trueAngleRad/(TMath::Pi()/180.);
@@ -628,6 +731,14 @@ bool MuonFitter::Execute(){
     trueStopVtxX = truestopvtx->GetPosition().X();
     trueStopVtxY = truestopvtx->GetPosition().Y();
     trueStopVtxZ = truestopvtx->GetPosition().Z();
+
+    get_ok = m_data->Stores["RecoEvent"]->Get("TrueTrackLengthInWater", trueTrackLengthInWater);
+    if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueTrackLengthInWater from RecoEvent Store!", v_error, verbosity); trueTrackLengthInWater = -1; }
+    trueTrackLengthInWater = trueTrackLengthInWater*100.;   //convert to cm
+    h_true_tanktrack_len->Fill(trueTrackLengthInWater);
+
+    get_ok = m_data->Stores["RecoEvent"]->Get("TrueTrackLengthInMRD", trueTrackLengthInMRD);
+    if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueTrackLengthInMRD from RecoEvent Store!", v_error, verbosity); trueTrackLengthInMRD = -1; }
 
     get_ok = m_data->Stores["RecoEvent"]->Get("NRings", nrings);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving NRings, true from RecoEvent!", v_error, verbosity); }
@@ -657,7 +768,8 @@ bool MuonFitter::Execute(){
     std::cout << " [debug] n_rings (my counter): " << n_rings << std::endl;
     if (n_rings > 1) hasPion = true;
   }
-  if (hasPion) return true;
+  //if (hasPion) return true;   //skip event if there is pion
+  if (hasPion) std::cout << " [debug] has pion!" << std::endl;    //just indicate that there is pion
 
 
   // --------------------------------------------------
@@ -752,6 +864,7 @@ bool MuonFitter::Execute(){
   double tankExitPointX = 100.*(tankExitPoint.X()-tank_center_x);
   double tankExitPointY = 100.*(tankExitPoint.Y()-tank_center_y);
   double tankExitPointZ = 100.*(tankExitPoint.Z()-tank_center_z);
+  TVector3 tankExit(tankExitPointX, tankExitPointY, tankExitPointZ);
 
   // Create vectors for MRD start/stop
   TVector3 mrdStart((mrdStartVertex.X()-tank_center_x)*100., (mrdStartVertex.Y()-tank_center_y)*100., (mrdStartVertex.Z()-tank_center_z)*100.);   //[cm]
@@ -798,7 +911,7 @@ bool MuonFitter::Execute(){
       //check if any vtx intersects with FV
       if (pow(v.X(),2) + pow(v.Y(),2) + pow(v.Z(),2) <= pow(tank_radius*100.-50.,2))
       {
-        std::cout << " [debug] (distance from tank center)^2: " << pow(v.X(),2) + pow(v.Y(),2) + pow(v.Z(),2) << std::endl;
+        //std::cout << " [debug] (distance from tank center)^2: " << pow(v.X(),2) + pow(v.Y(),2) + pow(v.Z(),2) << std::endl;
         inFV = true;
       }
     }
@@ -829,14 +942,14 @@ bool MuonFitter::Execute(){
   if (!isData)
   {
     h_lastvtx_z->Fill(vtxCandidates.at(vtxCandidates.size()-1).Z());
-    h_truevtx_z->Fill(trueVtxZ);
+    //h_truevtx_z->Fill(trueVtxZ);
   }
 
 
   // --------------------------------------------------
   // --- Check short tracks ---------------------------
   // --------------------------------------------------
-  // get distance btwn trueVtx and reco tankExitPoint
+  // get distance btwn trueVtx and reco tankExitPoint; not quite trueTrackLengthInWater
   double trueRecoTankTrackLength = 0.;
   if (!isData)
   {
@@ -852,7 +965,8 @@ bool MuonFitter::Execute(){
 
     TVector3 trueTankTrack = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - TVector3(trueVtxX, trueVtxY, trueVtxZ);
     // skip if tank track is short
-    if (trueRecoTankTrackLength < 100.)
+    //if (trueRecoTankTrackLength < 100.)
+    if (trueTrackLengthInWater < 100.)
     {
       std::cout << " Track less than 100 cm! SKIPPING! " << mcevnum << std::endl;
       return true;
@@ -908,9 +1022,9 @@ bool MuonFitter::Execute(){
   double max_vtx_charge = 0.;
 
   // Find the main cluster (max charge and in [0..2000ns] time window)
-  double max_cluster = 0;
-  double max_cluster_charge = 0;
-  double max_cluster_hits = 0;
+  double main_cluster_time = 0;
+  double main_cluster_charge = 0;
+  double main_cluster_hits = 0;
 
   bool found_muon = false;
   double earliest_hittime = 0;
@@ -952,12 +1066,12 @@ bool MuonFitter::Execute(){
       if (temp_hits > 0) temp_time /= temp_hits;  //mean time
       std::cout << " [debug] temp_time: " << temp_time << std::endl;
       if (temp_time > 2000. || temp_time < 0.) continue;  // not in time window
-      if (temp_charge > max_cluster_charge)
+      if (temp_charge > main_cluster_charge)
       {
         found_muon = true;
-        max_cluster_charge = temp_charge;
-        max_cluster = apair.first;    //actually the cluster time (same as mean time above)
-        max_cluster_hits = cluster_hits.size();
+        main_cluster_charge = temp_charge;
+        main_cluster_time = apair.first;    //same as mean time above
+        main_cluster_hits = cluster_hits.size();
       }
     }
   }
@@ -978,7 +1092,7 @@ bool MuonFitter::Execute(){
       for (int ihit = 0; ihit < cluster_hits_MC.size(); ihit++)
       {
         temp_hits++;
-        std::cout << " [debug] hit time: " << cluster_hits_MC.at(ihit).GetTime() << std::endl;
+        //std::cout << " [debug] hit time: " << cluster_hits_MC.at(ihit).GetTime() << std::endl;
         v_cluster_hits.push_back(cluster_hits_MC.at(ihit).GetTime());
         h_clusterhit_time->Fill(cluster_hits_MC.at(ihit).GetTime());
         temp_time += cluster_hits_MC.at(ihit).GetTime();
@@ -1000,7 +1114,7 @@ bool MuonFitter::Execute(){
         }
       }
       sort(v_cluster_hits.begin(), v_cluster_hits.end());
-      std::cout << " [debug] all cluster hit times: ";
+      std::cout << " [debug] all cluster hit times (sorted): ";
       for (int ct = 0; ct < v_cluster_hits.size(); ++ct)
       {
         std::cout << v_cluster_hits.at(ct) << ",";
@@ -1010,22 +1124,21 @@ bool MuonFitter::Execute(){
       if (temp_hits > 0) temp_time /= temp_hits;  //mean time
       v_cluster_times.push_back(temp_time);
       if (temp_time > 2000. || temp_time < 0.) continue;  // not in time window
-      if (temp_charge > max_cluster_charge)
+      if (temp_charge > main_cluster_charge)
       {
         found_muon = true;
-        max_cluster_charge = temp_charge;
-        max_cluster = apair.first;    //actually the cluster time (same as mean time above)
-        //max_cluster_hits = cluster_hits_MC.size();
+        main_cluster_charge = temp_charge;
+        main_cluster_time = apair.first;    //same as mean time above
+        //main_cluster_hits = cluster_hits_MC.size();
         earliest_hittime = v_cluster_hits.at(0);
         std::cout << " [debug] earliest_hittime: " << earliest_hittime << std::endl;
 
-        max_cluster_hits = 0;
+        main_cluster_hits = 0;
         for (unsigned long detkey = 332; detkey < 464; detkey++)
         {
           if (m_cluster_charge[detkey] > 0.)
           {
-            max_cluster_hits++;
-            h_pmt_charge->Fill(m_cluster_charge[detkey]);
+            main_cluster_hits++;
           }
         }
 
@@ -1038,14 +1151,14 @@ bool MuonFitter::Execute(){
     std::cout << v_cluster_times.at(ct) << ",";
   }
   std::cout << std::endl;
-  std::cout << " [debug] max_cluster (chosen cluster time): " << max_cluster << std::endl;
-  std::cout << " [debug] max_cluster_charge: " << max_cluster_charge << std::endl;
-  std::cout << " [debug] max_cluster_hits: " << max_cluster_hits << std::endl;
+  std::cout << " [debug] main_cluster_time: " << main_cluster_time << std::endl;
+  std::cout << " [debug] main_cluster_charge: " << main_cluster_charge << std::endl;
+  std::cout << " [debug] main_cluster_hits: " << main_cluster_hits << std::endl;
 
   // --------------------------------------------------
   // --- Check coincidence with MRD -------------------
   // --------------------------------------------------
-  double tankmrd_tdiff = mrdStartTime - max_cluster;
+  double tankmrd_tdiff = mrdStartTime - main_cluster_time;
   std::cout << " [debug] tankmrd_tdiff: " << tankmrd_tdiff << std::endl;
   if ((tankmrd_tdiff > PMTMRDOffset-50) && (tankmrd_tdiff < PMTMRDOffset+50))
   {
@@ -1059,47 +1172,125 @@ bool MuonFitter::Execute(){
   }
 
   // save info about main/max cluster
-  h_total_pe_hits->Fill(max_cluster_hits, max_cluster_charge);
-
-  // save to txt files
-  pehits_file << "p" << partnumber << "_";
-  if (isData) pehits_file << evnum;
-  else pehits_file << mcevnum;
-  pehits_file << "," << max_cluster_hits << "," << max_cluster_charge << std::endl;
-
+  h_total_pe_hits->Fill(main_cluster_hits, main_cluster_charge);
 
   double max_eta = 0.;
 
   if (found_muon)
   {
     std::cout << "MuonFitter Tool: Found muon candidate!" << std::endl;
+    std::cout << "MuonFitter Tool: p" << partnumber << "_";
+    if (isData) std::cout << evnum;
+    else std::cout << mcevnum;
+    std::cout << std::endl;
+
+    // save to txt files
+    pehits_file << "p" << partnumber << "_";
+    if (isData) pehits_file << evnum;
+    else pehits_file << mcevnum;
+    pehits_file << "," << main_cluster_hits << "," << main_cluster_charge << std::endl;
 
     // Load cluster hits & detkeys
     std::vector<Hit> cluster_hits;
     std::vector<MCHit> cluster_hits_MC;
-    if (isData) { cluster_hits = m_all_clusters->at(max_cluster); }
-    else { cluster_hits_MC = m_all_clusters_MC->at(max_cluster); }
-    std::vector<unsigned long> cluster_detkeys = m_all_clusters_detkeys->at(max_cluster);
+    if (isData) { cluster_hits = m_all_clusters->at(main_cluster_time); }
+    else { cluster_hits_MC = m_all_clusters_MC->at(main_cluster_time); }
+    std::vector<unsigned long> cluster_detkeys = m_all_clusters_detkeys->at(main_cluster_time);
     std::vector<double> x_hits, y_hits, z_hits;
-    double cluster_charge = 0.;   //TODO:make cluster or individual PMT charge cut?
 
+    // --------------------------------------------------
+    // --- Fitted tank track ----------------------------
+    // --------------------------------------------------
+    //double t0 = -999.;
+    double fitted_track_len = -999.;
+    TVector3 best_fit_vertex;
+    if (fit_mode)
+    {
+      std::stringstream ev_id;
+      ev_id << "p" << partnumber << "_";
+      if (isData) ev_id << evnum;
+      else ev_id << mcevnum;
+
+      std::map<std::string, double>::iterator it = m_tank_track_fits.find(ev_id.str());
+      if (it != m_tank_track_fits.end())
+      {
+        fitted_track_len = m_tank_track_fits.at(ev_id.str());
+        std::cout << " [debug] found track for " << ev_id.str() << ": " << fitted_track_len << endl;
+        h_fitted_track_len->Fill(fitted_track_len);
+
+        // get the vertex coordinates from fit
+        best_fit_vertex = tankExit - fitted_track_len*mrdTrackDir;  //TODO:draw best fit and true vtx in 3D geo
+        std::cout << " [debug] best_fit_vertex (x,y,z): " << best_fit_vertex.X() << "," << best_fit_vertex.Y() << "," << best_fit_vertex.Z() << std::endl;
+        h_vtxfit_x->Fill(best_fit_vertex.X());
+        h_vtxfit_y->Fill(best_fit_vertex.Y());
+        h_vtxfit_z->Fill(best_fit_vertex.Z());
+        h_topview_fit->Fill(best_fit_vertex.Z(),best_fit_vertex.X());
+        h_sideview_fit->Fill(best_fit_vertex.Z(),best_fit_vertex.Y());
+
+        if (!isData)
+        {
+          std::cout << " [debug] true vertex (x,y,z): " << trueVtxX << "," << trueVtxY << "," << trueVtxZ << std::endl;
+          h_truefitdiff_x->Fill(best_fit_vertex.X()-trueVtxX);
+          h_truefitdiff_y->Fill(best_fit_vertex.Y()-trueVtxY);
+          h_truefitdiff_z->Fill(best_fit_vertex.Z()-trueVtxZ);
+          h_truefit_len_diff->Fill(TMath::Abs(fitted_track_len-trueTrackLengthInWater));
+          h_truevtx_x->Fill(trueVtxX);
+          h_truevtx_y->Fill(trueVtxY);
+          h_truevtx_z->Fill(trueVtxZ);
+          h_topview_truth->Fill(trueVtxZ,trueVtxX);
+          h_sideview_truth->Fill(trueVtxZ,trueVtxY);
+
+          h_deltaR->Fill(TMath::Sqrt(pow(best_fit_vertex.X()-trueVtxX,2) + pow(best_fit_vertex.Y()-trueVtxY,2) + pow(best_fit_vertex.Z()-trueVtxZ,2)));
+        }
+
+        // look at timing, t0
+        //t0 = fitted_track_len/(30./1.33);
+      }
+      else std::cout << " no fitted track found for: " << ev_id.str() << std::endl;
+    }
+
+
+    // --------------------------------------------------
     // METHOD: CALCULATE ai FOR EACH PMT
+    // --------------------------------------------------
     std::map<unsigned long, double> charge;
+    std::map<unsigned long, std::vector<double>> hittime;
     std::map<int, std::vector<double>> m_PE_ai;
     std::map<int, std::vector<double>> m_fpmt_ai;
 
+    charge.clear();
+    hittime.clear();
+    for (unsigned long detkey = 332; detkey < 464; ++detkey)
+    {
+      charge.emplace(detkey, 0.);
+      hittime.emplace(detkey, std::vector<double>{-99.});
+    }
+
     if (isData)
     {
-      charge.clear();
-      for (unsigned long detkey = 332; detkey < 464; ++detkey) { charge.emplace(detkey, 0.); }
+      for (int i = 0; i < (int)cluster_hits.size(); ++i)
+      {
+        //for each hit
+        int chankey = cluster_hits.at(i).GetTubeId();
+        std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
+        if (it != ChannelKeyToSPEMap.end())
+        {
+          Detector* this_detector = geom->ChannelToDetector(chankey);
+          unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
+          Position det_pos = this_detector->GetDetectorPosition();
+          double hit_charge = cluster_hits.at(i).GetCharge();
+          double hit_PE = hit_charge / ChannelKeyToSPEMap.at(chankey);
+          double hit_time = cluster_hits.at(i).GetTime();
+          hittime[detkey].push_back(hit_time);
+          h_charge_detkey->Fill(detkey, hit_PE);
 
-      std::cout << " Need to fill in code for data case (ai method)" << std::endl;
+          // keep track of total charge seen by each PMT
+          charge[detkey] += hit_PE;
+        } //end if ChannelKeyToSPEMap
+      } //end cluster_hits loop
     }
     else  //is MC
     {
-      charge.clear();
-      for (unsigned long detkey = 332; detkey < 464; ++detkey) { charge.emplace(detkey, 0.); }
-
       for (int i = 0; i < (int)cluster_hits_MC.size(); ++i)
       {
         //for each hit
@@ -1113,187 +1304,229 @@ bool MuonFitter::Execute(){
           double hit_PE = cluster_hits_MC.at(i).GetCharge();  //in PE
           double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
           double hit_time = cluster_hits_MC.at(i).GetTime();
-          double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
-          double hitY = 100.*(det_pos.Y()-tank_center_y);
-          double hitZ = 100.*(det_pos.Z()-tank_center_z);
-          x_hits.push_back(hitX);
-          y_hits.push_back(hitY);
-          z_hits.push_back(hitZ);
-          //Direction dirPMT = this_detector->GetDetectorDirection();
-          //TVector3 pmt_dir = TVector3(dirPMT.X()*100., dirPMT.Y()*100., dirPMT.Z()*100.).Unit();
+          hittime[detkey].push_back(hit_time);
+          h_charge_detkey->Fill(detkey, hit_PE);
 
           // keep track of total charge seen by each PMT
           charge[detkey] += hit_PE;
-        } //end if ChannelKetToSPEMap; TEST PE CUT
-      } //end cluster_hits_MC loop; TEST PE CUT
+        } //end if ChannelKetToSPEMap
+      } //end cluster_hits_MC loop
+    }
 
-
-      int i = 0;    //index for TGraph
-      for (unsigned long detkey = 332; detkey < 464; ++detkey)
-      {
-          //PE CUT
-          //NOTE: there will be PMTs w/ 0 charge from initialization of charge map
-          if (charge[detkey] == 0) continue;
-
-          double hit_PE = charge[detkey];
-          if (charge[detkey] < PMTQCut)
-          {
-            std::cout << " [debug] SKIPPING charge[" << detkey << "] < " << PMTQCut << "pe: " << charge[detkey] << std::endl;
-            //std::cout << " [debug] JK setting charge to 0" << std::endl;
-            hit_PE = 0.;
-            continue;
-          }
-
-          double hitX = x_pmt[detkey];
-          double hitY = y_pmt[detkey];
-          double hitZ = z_pmt[detkey];
-          double dirPMTX = x_pmt_dir[detkey];
-          double dirPMTY = y_pmt_dir[detkey];
-          double dirPMTZ = z_pmt_dir[detkey];
-          
-          TVector3 pmt_dir = TVector3(dirPMTX, dirPMTY, dirPMTZ).Unit();
-
-          // get vector from tankExitPoint to PMT (Ri)
-          TVector3 vec_Ri = TVector3(hitX,hitY,hitZ) - TVector3(tankExitPointX,tankExitPointY,tankExitPointZ);
-          double Ri = vec_Ri.Mag();
-          h_tankexit_to_pmt->Fill(Ri);
-          std::cout << " [debug] vec_Ri: " << vec_Ri.X() << "," << vec_Ri.Y() << "," << vec_Ri.Z() << std::endl;
-          std::cout << " [debug] vec_Ri direction: " << vec_Ri.Unit().X() << "," << vec_Ri.Unit().Y() << "," << vec_Ri.Unit().Z() << std::endl;
-
-          // get angle btwn Ri and muon direction (ai)
-          double ang_alpha = vec_Ri.Angle(-mrdTrackDir);  //rad
-          std::cout << " [debug] ang_alpha, detkey: " << ang_alpha*180./TMath::Pi() << ", " << detkey << std::endl;
-          std::cout << " [debug] tankExitPoint: " << tankExitPointX << "," << tankExitPointY << "," << tankExitPointZ << std::endl;
-
-          double ai = Ri * TMath::Sin(ang_alpha) / TMath::Tan(CHER_ANGLE_RAD) + Ri * TMath::Cos(ang_alpha);
-          h_tanktrack_ai->Fill(ai);
-
-          // get the vector from the vertex of ai to the PMT (bi)
-          std::cout << " [debug] hitXYZ for detkey " << detkey << ": " << hitX << "," << hitY << "," << hitZ << std::endl;
-          TVector3 vec_ai = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - ai*mrdTrackDir;  //this is along the track
-          std::cout << " [debug] vec_ai: " << vec_ai.X() << "," << vec_ai.Y() << "," << vec_ai.Z() << std::endl;
-          TVector3 vec_bi = TVector3(hitX,hitY,hitZ) - vec_ai;
-          std::cout << " [debug] vec_bi: " << vec_bi.X() << "," << vec_bi.Y() << "," << vec_bi.Z() << std::endl;
-
-          //std::cout << " [debug] angle check: " << vec_bi.Angle(mrdTrackDir)*180./TMath::Pi() << std::endl;
-
-          // find angle btwn true vertex and hit
-          TVector3 vec_truevtx_hit = TVector3(hitX,hitY,hitZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
-          double anglePmtTrueVtx = vec_truevtx_hit.Angle(mrdTrackDir)*180./TMath::Pi();
-          //if (anglePmtTrueVtx < CHER_ANGLE_DEG+insideAngle) h_qincone_truevtx->Fill(it_PE);
-          //if (anglePmtTrueVtx > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(hit_PE);
-
-          // loop through all hits for this ai and determine whether in/out cone
-/*          double qInCone = 0., qOutCone = 0.;
-          for (int j = 0; j < (int)cluster_hits_MC.size(); ++j)
-          {
-            //for each hit
-            int chankey = cluster_hits_MC.at(j).GetTubeId();
-            std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
-            if (it != ChannelKeyToSPEMap.end())
-            {
-              Detector* this_detector = geom->ChannelToDetector(chankey);
-              unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
-              Position det_pos = this_detector->GetDetectorPosition();
-              double hit_PE = cluster_hits_MC.at(j).GetCharge();  //in PE
-              //double hit_charge = hit_PE * ChannelKeyToSPEMap.at(chankey);
-              double hit_time = cluster_hits_MC.at(j).GetTime();
-              double hitX = 100.*(det_pos.X()-tank_center_x);   //[cm]
-              double hitY = 100.*(det_pos.Y()-tank_center_y);   //[cm]
-              double hitZ = 100.*(det_pos.Z()-tank_center_z);   //[cm]
-
-              TVector3 vec_ai_pmt = TVector3(hitX,hitY,hitZ) - vec_ai;
-              double anglePmtAi = vec_ai_pmt.Angle(mrdTrackDir)*180./TMath::Pi();
-              //std::cout << " [debug] anglePmtAi: " << anglePmtAi << std::endl;
-              if (anglePmtAi < CHER_ANGLE_DEG-5.) qInCone += hit_PE;
-              if (anglePmtAi > CHER_ANGLE_DEG+5.) qOutCone += hit_PE;
-            }
-          }
-          gr_qincone_ai->SetPoint(i, ai, qInCone);
-          gr_qoutcone_ai->SetPoint(i, ai, qOutCone); */
-
-          // get angle btwn vector bi and pmt dir
-          double psi = vec_bi.Angle(-pmt_dir);
-          if (psi > TMath::Pi()/2.) psi = TMath::Pi()-psi;
-          //std::cout << " [debug] psi(+), psi(-): " << psi*180./TMath::Pi() << ", " << vec_bi.Angle(pmt_dir)*180./TMath::Pi() << std::endl;
-
-          // calculate the area of PMT & frustum
-          //double area_pmt = 0.5*TMath::Pi()*pow(4.*2.54, 2)*(1. + TMath::Cos(psi));
-          double eff_area_pmt = 0.5*m_pmt_area[detkey]*(1.+TMath::Cos(psi));
-          h_eff_area_pmt->Fill(eff_area_pmt);
-          double area_frustum = 2.*TMath::Pi()*(deltaL)*Ri;
-          double f_pmt = eff_area_pmt / area_frustum;
-          h_fpmt->Fill(f_pmt);
-
-          gr_effarea_detkey->SetPoint(i, detkey, eff_area_pmt);
-          gr_fpmt_detkey->SetPoint(i, detkey, f_pmt);
-          gr_effarea_ai->SetPoint(i, ai, eff_area_pmt);
-          gr_fpmt_ai->SetPoint(i, ai, f_pmt);
-          //gr_eta_ai->SetPoint(i, ai, hit_PE / f_pmt);
-
-          h_eta_ai->Fill(ai, hit_PE / f_pmt);
-
-          for (int i = 55; i < 500; i+=deltaL)
-          {
-            if (ai >= i-deltaL/2 && ai < i+deltaL/2)
-            {
-              m_PE_ai[i].push_back(hit_PE);
-              m_fpmt_ai[i].push_back(f_pmt);
-            }
-          }
-
-
-          //XXX: checking PMT direction by drawing sphere in front of PMT
-/*          TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
-          if (detkey == 400)
-          {
-            // tankExit
-            sprintf(blockName,"tankExit_%u",N);
-            bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
-            bBlock->SetLineColor(3);
-            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(tankExitPointX, tankExitPointY, tankExitPointZ));
-            N++;
-
-            // direction of Ri
-            sprintf(blockName,"RiDir_%u",N);
-            bBlock = ageom->MakeSphere(blockName, Iron, 0,1.5,0,180,0,360);
-            bBlock->SetLineColor(5);
-            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(Ri_dir.X(), Ri_dir.Y(), Ri_dir.Z()));
-            N++;
-
-            // bi vertex
-            sprintf(blockName, "bi_%u",N);
-            bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
-            bBlock->SetLineColor(9);
-            EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(vec_bi.X()+vec_ai.X(), vec_bi.Y()+vec_ai.Y(), vec_bi.Z()+vec_ai.Z()));
-            N++;
-          } //end if detkey==400 */
-
-          ++i;
-        } //end charge[detkey] loop; TEST PE CUT
-
-    //    } //end if ChannelKeytoSPEMap; COMMENTED OUT FOR TEST PE CUT
-    //  } //end for loop thru cluster hits; COMMENTED OUT FOR TEST PE CUT
-    } //end is MC
-
-    // find which pmt charges are inside/outside cone of true track direction
+    // Go through charge, hittime maps
+    int gi = 0;    //counter for TGraph
+    int nhits = 0, nhits_incone = 0;
+    double totalpe = 0, totalpe_incone = 0;
+    std::vector<double> v_tzero;
     for (unsigned long detkey = 332; detkey < 464; ++detkey)
     {
-      if (charge[detkey] != 0.)
-      {
-        // find vector from true vertex to PMT
-        TVector3 vec_pmt = TVector3(x_pmt[detkey],y_pmt[detkey],z_pmt[detkey]) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
-        std::cout << " [debug] xyz_pmt[detkey] " << detkey << ": " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << std::endl;
-        // find angle between pmt vector (vec_pmt) and true track direction
-        double pmt_angle = vec_pmt.Angle(trueTrackDir)*180./TMath::Pi();
-        std::cout << " [debug] vec_pmt: " << vec_pmt.X() << "," << vec_pmt.Y() << "," << vec_pmt.Z() << std::endl;
-        std::cout << " [debug] pmt_angle: " << pmt_angle << std::endl;
-        std::cout << " [debug] trueTrackDir: " << trueTrackDir.X() << "," << trueTrackDir.Y() << "," << trueTrackDir.Z() << std::endl;
-        std::cout << " [debug] trueVtx: " << trueVtxX << "," << trueVtxY << "," << trueVtxZ << std::endl;
-        std::cout << " [debug] trueStopVtx: " << trueStopVtxX << "," << trueStopVtxY << "," << trueStopVtxZ << std::endl;
+      double pmt_PE = charge[detkey];
+      h_pmt_charge->Fill(pmt_PE);
+      
+      if (pmt_PE == 0) continue;    //NOTE: there will be PMTs w/ 0 p.e. from charge map initialization
 
-        if (pmt_angle < CHER_ANGLE_DEG+insideAngle) h_qincone_truevtx->Fill(charge[detkey]);
-        if (pmt_angle > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(charge[detkey]);
+      std::vector<double> v_hit_times = hittime[detkey];
+      double pmt_t = 0;
+      int nhits_pmt = v_hit_times.size();
+      std::cout << " [debug] all hit times for detkey " << detkey << ": ";
+      for (int ht = 0; ht < nhits_pmt; ++ht) { std::cout << v_hit_times.at(ht) << ","; }
+      std::cout << std::endl;
+
+      //get earliest hit time bc Cherenkov radiation is usually earliest time
+      sort(v_hit_times.begin(), v_hit_times.end());
+      pmt_t = v_hit_times.at(0);
+      if (pmt_t == -99.) pmt_t = v_hit_times.at(1);
+      std::cout << " [debug] final pmt_t: " << pmt_t << std::endl;
+      
+
+      //PE CUT
+      if (pmt_PE < PMTQCut)
+      {
+        std::cout << " [debug] SKIPPING charge[" << detkey << "] < " << PMTQCut << "pe: " << charge[detkey] << std::endl;
+        pmt_PE = 0.;    //set PMT charge to 0
+        continue;       //skip PMT entirely
+      }
+
+      nhits += 1;   //keep track of total hits that meet PE cut in this event
+      totalpe += pmt_PE;
+
+      double hitX = x_pmt[detkey];
+      double hitY = y_pmt[detkey];
+      double hitZ = z_pmt[detkey];
+      double dirPMTX = x_pmt_dir[detkey];
+      double dirPMTY = y_pmt_dir[detkey];
+      double dirPMTZ = z_pmt_dir[detkey];
+      
+      TVector3 pmt_dir = TVector3(dirPMTX, dirPMTY, dirPMTZ).Unit();
+
+      // get vector from tankExitPoint to PMT (Ri)
+      TVector3 vec_Ri = TVector3(hitX,hitY,hitZ) - TVector3(tankExitPointX,tankExitPointY,tankExitPointZ);
+      double Ri = vec_Ri.Mag();
+      h_tankexit_to_pmt->Fill(Ri);
+      std::cout << " [debug] vec_Ri: " << vec_Ri.X() << "," << vec_Ri.Y() << "," << vec_Ri.Z() << std::endl;
+      std::cout << " [debug] vec_Ri direction: " << vec_Ri.Unit().X() << "," << vec_Ri.Unit().Y() << "," << vec_Ri.Unit().Z() << std::endl;
+
+      // get angle btwn Ri and muon direction (ai)
+      double ang_alpha = vec_Ri.Angle(-mrdTrackDir);  //rad
+      std::cout << " [debug] tankExitPoint: " << tankExitPointX << "," << tankExitPointY << "," << tankExitPointZ << std::endl;
+
+      double ai = Ri * TMath::Sin(ang_alpha) / TMath::Tan(CHER_ANGLE_RAD) + Ri * TMath::Cos(ang_alpha);
+      h_tanktrack_ai->Fill(ai);
+
+      // get the vector from the vertex of ai to the PMT (bi)
+      //TVector3 vec_ai = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - ai*mrdTrackDir;  //in tank along mrd track (opposite mrdTrackDir)
+      TVector3 vec_ai = tankExit - ai*mrdTrackDir;    //vector to where ai starts in tank, along mrd track
+      TVector3 vec_bi = TVector3(hitX,hitY,hitZ) - vec_ai;
+      double bi = TMath::Sqrt(pow(hitX-vec_ai.X(),2) + pow(hitY-vec_ai.Y(),2) + pow(hitZ-vec_ai.Z(),2));
+      std::cout << " [debug] vec_ai: " << vec_ai.X() << "," << vec_ai.Y() << "," << vec_ai.Z() << std::endl;
+      std::cout << " [debug] vec_bi: " << vec_bi.X() << "," << vec_bi.Y() << "," << vec_bi.Z() << std::endl;
+
+      // do something with time
+      double t0 = -999.;
+      if (fit_mode)
+      {
+        // check if hit falls inside cone of FITTED vertex
+        TVector3 vtx2tankExit = tankExit - best_fit_vertex;   //similar to ai vector
+        TVector3 vtx2pmt = TVector3(hitX,hitY,hitZ) - best_fit_vertex;
+
+        double ang = vtx2pmt.Angle(mrdTrackDir);
+
+        if (!isData && display_truth)
+        {
+          std::cout << " [debug] vtx2tankExit (before truth): " << vtx2tankExit.X() << "," << vtx2tankExit.Y() << "," << vtx2tankExit.Z() << std::endl;
+          vtx2tankExit = TVector3(trueStopVtxX,trueStopVtxY,trueStopVtxZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+          vtx2pmt = TVector3(hitX,hitY,hitZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+          std::cout << " [debug] vtx2tankExit (after truth): " << vtx2tankExit.X() << "," << vtx2tankExit.Y() << "," << vtx2tankExit.Z() << std::endl;
+          //ang = vtx2pmt.Angle(vtx2tankExit);
+          ang = vtx2pmt.Angle(trueTrackDir);
+          std::cout << " [debug] ang (w/ trueTrackDir, w/ vtx2tankExit): " << ang << "," << vtx2pmt.Angle(vtx2tankExit) << std::endl;
+        }
+
+        if (ang <= CHER_ANGLE_RAD)
+        {
+          //t0 = pmt_t - (TVector3(hitX,hitY,hitZ).Dot(mrdTrackDir) + ai) - TMath::Sqrt(1.33*1.33-1)*TVector3(hitX,hitY,hitZ).Cross(mrdTrackDir).Mag();
+          t0 = pmt_t - (vtx2pmt.Dot(mrdTrackDir) + TMath::Sqrt(1.33*1.33-1)*vtx2pmt.Cross(mrdTrackDir).Mag()) / 30.;
+
+          if (!isData && display_truth)
+          {
+            t0 = pmt_t - (vtx2pmt.Dot(trueTrackDir) + TMath::Sqrt(1.33*1.33-1)*vtx2pmt.Cross(trueTrackDir).Mag()) / 30.;
+          }
+          std::cout << " [debug] pmt_t made it inside cone! " << pmt_t << "," << t0 << std::endl;
+          v_tzero.push_back(t0);
+          nhits_incone += 1;
+          totalpe_incone += pmt_PE;
+        }
+        else { std::cout << " [debug] pmt_t did not make it inside cone! " << pmt_t << std::endl; }
+      }
+
+
+      // find angle btwn true vertex and hit
+      if (!isData)
+      {
+        TVector3 vec_truevtx_hit = TVector3(hitX,hitY,hitZ) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+        double anglePmtTrueVtx = vec_truevtx_hit.Angle(mrdTrackDir)*180./TMath::Pi();
+      }
+
+      // get angle btwn vector bi and pmt dir
+      double psi = vec_bi.Angle(-pmt_dir);    //used only to get angle; don't use for magnitude
+      if (psi > TMath::Pi()/2.) psi = TMath::Pi()-psi;
+      //std::cout << " [debug] psi(+), psi(-): " << psi*180./TMath::Pi() << ", " << vec_bi.Angle(pmt_dir)*180./TMath::Pi() << std::endl;
+
+      // calculate the area of PMT & frustum
+      double eff_area_pmt = 0.5*m_pmt_area[detkey]*(1.+TMath::Cos(psi));
+      h_eff_area_pmt->Fill(eff_area_pmt);
+      double area_frustum = 2.*TMath::Pi()*(deltaL)*Ri;
+      double f_pmt = eff_area_pmt / area_frustum;
+      h_fpmt->Fill(f_pmt);
+
+      gr_effarea_detkey->SetPoint(gi, detkey, eff_area_pmt);
+      gr_fpmt_detkey->SetPoint(gi, detkey, f_pmt);
+      gr_effarea_ai->SetPoint(gi, ai, eff_area_pmt);
+      gr_fpmt_ai->SetPoint(gi, ai, f_pmt);
+
+      h_eta_ai->Fill(ai, pmt_PE / f_pmt);
+
+      for (int a = 55; a < 500; a+=deltaL)
+      {
+        if (ai >= a-deltaL/2 && ai < a+deltaL/2)
+        {
+          m_PE_ai[a].push_back(pmt_PE);
+          m_fpmt_ai[a].push_back(f_pmt);
+        }
+      }
+
+
+      //XXX: checking PMT direction by drawing sphere in front of PMT
+/*      TVector3 Ri_dir = TVector3(hitX, hitY, hitZ) + 10.*vec_Ri.Unit();
+      if (detkey == 400)
+      {
+        // tankExit
+        sprintf(blockName,"tankExit_%u",N);
+        bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
+        bBlock->SetLineColor(3);
+        EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(tankExitPointX, tankExitPointY, tankExitPointZ));
+        N++;
+
+        // direction of Ri
+        sprintf(blockName,"RiDir_%u",N);
+        bBlock = ageom->MakeSphere(blockName, Iron, 0,1.5,0,180,0,360);
+        bBlock->SetLineColor(5);
+        EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(Ri_dir.X(), Ri_dir.Y(), Ri_dir.Z()));
+        N++;
+
+        // bi vertex
+        sprintf(blockName, "bi_%u",N);
+        bBlock = ageom->MakeSphere(blockName, Iron, 0,2,0,180,0,360);
+        bBlock->SetLineColor(9);
+        EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(vec_bi.X()+vec_ai.X(), vec_bi.Y()+vec_ai.Y(), vec_bi.Z()+vec_ai.Z()));
+        N++;
+      } //end if detkey==400 */
+
+      ++gi;
+
+    } //end charge[detkey] loop
+
+    if (fit_mode)
+    {
+      nhits_trlen_file << "p" << partnumber << "_";
+      if (isData) nhits_trlen_file << evnum;
+      else nhits_trlen_file << mcevnum;
+      nhits_trlen_file << "," << fitted_track_len << "," << nhits << "," << nhits_incone << "," << totalpe << "," << totalpe_incone << std::endl;
+    }
+
+
+    // Find mean t0 and subtract to center hist around 0
+    double mean_t0 = 0.;
+    for (int t = 0; t < v_tzero.size(); ++t) { mean_t0 += v_tzero.at(t); }
+    if (v_tzero.size() != 0) mean_t0 /= v_tzero.size();
+    std::cout << " [debug] mean_t0: " << mean_t0 << std::endl;
+
+    for (int t = 0; t < v_tzero.size(); ++t) { h_tzero->Fill(v_tzero.at(t)-mean_t0); }
+
+    h_uber_t0widths->Fill(h_tzero->GetStdDev());
+
+
+    // find which pmt charges are inside/outside cone of true track direction
+    if (!isData)
+    {
+      for (unsigned long detkey = 332; detkey < 464; ++detkey)
+      {
+        if (charge[detkey] != 0.)
+        {
+          // find vector from true vertex to PMT
+          TVector3 vec_pmt = TVector3(x_pmt[detkey],y_pmt[detkey],z_pmt[detkey]) - TVector3(trueVtxX,trueVtxY,trueVtxZ);
+          std::cout << " [debug] xyz_pmt[detkey] " << detkey << ": " << x_pmt[detkey] << "," << y_pmt[detkey] << "," << z_pmt[detkey] << std::endl;
+          // find angle between pmt vector (vec_pmt) and true track direction
+          double pmt_angle = vec_pmt.Angle(trueTrackDir)*180./TMath::Pi();
+          std::cout << " [debug] vec_pmt: " << vec_pmt.X() << "," << vec_pmt.Y() << "," << vec_pmt.Z() << std::endl;
+          std::cout << " [debug] pmt_angle: " << pmt_angle << std::endl;
+          std::cout << " [debug] trueTrackDir: " << trueTrackDir.X() << "," << trueTrackDir.Y() << "," << trueTrackDir.Z() << std::endl;
+          std::cout << " [debug] trueVtx: " << trueVtxX << "," << trueVtxY << "," << trueVtxZ << std::endl;
+          std::cout << " [debug] trueStopVtx: " << trueStopVtxX << "," << trueStopVtxY << "," << trueStopVtxZ << std::endl;
+
+          if (pmt_angle < CHER_ANGLE_DEG+insideAngle) h_qincone_truevtx->Fill(charge[detkey]);
+          if (pmt_angle > CHER_ANGLE_DEG+outsideAngle) h_qoutcone_truevtx->Fill(charge[detkey]);
+        }
       }
     }
 
@@ -1311,15 +1544,21 @@ bool MuonFitter::Execute(){
         total_PE_ai += m_PE_ai[pair.first].at(e);
       }
       double total_eta = total_PE_ai / total_fpmt_ai;
-      if (total_eta > max_eta) max_eta = total_eta;
+      if (total_eta > max_eta) max_eta = total_eta;     //for plotting
       
       gr_eta_ai->SetPoint(j, pair.first, total_eta);
+      // save (ai,eta) data to txt file
+      pos_file << "p" << partnumber << "_";
+      if (isData) pos_file << evnum;
+      else pos_file << mcevnum;
+      pos_file << "," << pair.first << "," << total_eta << std::endl;
       avg_eta += total_eta;
       
       if (j == 0) running_avg = avg_eta;
       else
       {
-        running_avg = avg_eta / j;
+        std::cout << " [debug] avg_eta (before dividing j, so it is total eta): " << avg_eta << std::endl;
+        running_avg = avg_eta / (j+1);
 
         if (running_avg < EtaThreshold && !found_vtx)
         {
@@ -1331,32 +1570,38 @@ bool MuonFitter::Execute(){
       }
 
       std::cout << " [debug] ai, running_avg: " << pair.first << ", " << running_avg << std::endl;
-      std::cout << " [debug] EtaThreshold: " << EtaThreshold << std::endl;
       gr_running_avg->SetPoint(j, pair.first, running_avg);
 
-      if (pair.first < trueRecoTankTrackLength)   //left of true track length
+      if (!isData)
       {
-        std::cout << " [debug] total_eta (left): " << total_eta << std::endl;
-        num_left_eta++;
-        left_avg_eta += total_eta;
-      }
-      if (pair.first > trueRecoTankTrackLength)   //right of true track length
-      {
-        std::cout << " [debug] total_eta (right): " << total_eta << std::endl;
-        num_right_eta++;
-        right_avg_eta += total_eta;
+        if (pair.first < trueTrackLengthInWater)   //left of true track length
+        {
+          std::cout << " [debug] total_eta (left): " << total_eta << std::endl;
+          num_left_eta++;
+          left_avg_eta += total_eta;
+        }
+        if (pair.first > trueTrackLengthInWater)   //right of true track length
+        {
+          std::cout << " [debug] total_eta (right): " << total_eta << std::endl;
+          num_right_eta++;
+          right_avg_eta += total_eta;
+        }
       }
       j+=1;
     }
     avg_eta /= j;
-    std::cout << " [debug] num pmts (left, right): " << num_left_eta << ", " << num_right_eta << std::endl;
-    if (num_left_eta != 0) left_avg_eta /= num_left_eta;
-    if (num_right_eta != 0) right_avg_eta /= num_right_eta;
-    std::cout << " [debug] left avg: " << left_avg_eta << ", right avg: " << right_avg_eta << std::endl;
-    std::cout << " [debug] avg eta: " << avg_eta << ", j: " << j << std::endl;
     h_avg_eta->Fill(avg_eta);
-    h_lr_avg_eta->Fill(left_avg_eta);
-    h_lr_avg_eta->Fill(right_avg_eta);
+    std::cout << " [debug] avg eta: " << avg_eta << ", j: " << j << std::endl;
+
+    if (!isData)
+    {
+      std::cout << " [debug] num pmts (left, right): " << num_left_eta << ", " << num_right_eta << std::endl;
+      if (num_left_eta != 0) left_avg_eta /= num_left_eta;
+      if (num_right_eta != 0) right_avg_eta /= num_right_eta;
+      std::cout << " [debug] left avg: " << left_avg_eta << ", right avg: " << right_avg_eta << std::endl;
+      h_lr_avg_eta->Fill(left_avg_eta);
+      h_lr_avg_eta->Fill(right_avg_eta);
+    }
 
     // running avg of entire graph
     // this might just be smoothing...
@@ -1367,15 +1612,17 @@ bool MuonFitter::Execute(){
     }
 
     // save to txt files
-    lravg_file << "p" << partnumber << "_";
-    if (isData) lravg_file << evnum;
-    else lravg_file << mcevnum;
-    lravg_file << "," << left_avg_eta << "," << right_avg_eta << std::endl;
-    //lravg_file << "," << trueRecoTankTrackLength << std::endl;
-
+    if (!isData && display_truth)
+    {
+      // Save truth information
+      truetrack_file << "p" << partnumber << "_" << mcevnum << ",";
+      truetrack_file << trueTrackLengthInWater << "," << left_avg_eta << "," << right_avg_eta << std::endl;
+    }
 
   
+    // --------------------------------------------------
     // METHOD: STEPPING BACK FROM TANKEXITPT FOR VTX CANDIDATES
+    // --------------------------------------------------
     std::map<int, double> m_vtx_charge_incone;   //map of total charge seen at ea vtx candidate
     std::map<int, double> m_vtx_charge_per_pmt_incone;
     std::map<int, double> m_vtx_detkey_incone;
@@ -1651,9 +1898,6 @@ bool MuonFitter::Execute(){
       //compare avg charge per pmt
       avg_charge_per_pmt_in = avg_charge_per_pmt_in / vtxCandidates.size();
       avg_charge_per_pmt_out = avg_charge_per_pmt_out / vtxCandidates.size();
-      //TODO:FIGURE OUT WHY AVG OUT IS HIGHER THAN ITS VALUES
-      //std::cout << " AVG CHARGE PER PMT IN/OUT: " << avg_charge_per_pmt_in << ", " << avg_charge_per_pmt_out << std::endl;
-      //cpp_file << ",,,,,," << avg_charge_per_pmt_in << "," << avg_charge_per_pmt_out << "loop" << std::endl;
 
       // --------------------------------------------------
       // --- Find best vertex -----------------------------
@@ -1795,11 +2039,9 @@ bool MuonFitter::Execute(){
   }
 
   //saving graph
-  if (gr_vtx_charge_in->GetMaxSize() != 0)
+  //if (gr_vtx_charge_in->GetMaxSize() != 0)
+  if (found_muon)
   {
-    if (isData) std::cout << " [debug] Saving graphs to canvas... Ev " << evnum << std::endl;
-    else std::cout << " [debug] Saving graphs to canvas... Ev " << mcevnum << std::endl;
-
     // Total charge
     c_vtx_charge->cd();
     std::stringstream ss_cvtxq_grtitle, ss_cvtxq_grname;
@@ -1953,12 +2195,10 @@ bool MuonFitter::Execute(){
     ss_effarea_ai_name << "c_effarea_ai_p" << partnumber << "_ev";
     if (isData)
     {
-      //ss_effarea_title << evnum;
       ss_effarea_ai_name << evnum;
     }
     else
     {
-      //ss_effarea_title << mcevnum;
       ss_effarea_ai_name << mcevnum;
     }
     gr_effarea_ai->Draw("alp");
@@ -1973,12 +2213,10 @@ bool MuonFitter::Execute(){
     ss_fpmt_ai_name << "c_fpmt_ai_p" << partnumber << "_ev";
     if (isData)
     {
-      //ss_fpmt_title << evnum;
       ss_fpmt_ai_name << evnum;
     }
     else
     {
-      //ss_fpmt_title << mcevnum;
       ss_fpmt_ai_name << mcevnum;
     }
     gr_fpmt_ai->Draw("alp");
@@ -2001,10 +2239,12 @@ bool MuonFitter::Execute(){
     {
       ss_eta_title << mcevnum;
       ss_eta_ai_name << mcevnum;
-      ss_truetrack << "true track: " << trueRecoTankTrackLength << " cm";
-      //gr_eta_ai->SetTitle(ss_truetrack.str().c_str());
+      ss_truetrack << "true track length in water: " << trueTrackLengthInWater << " cm";
+      if (display_truth) gr_eta_ai->SetTitle(ss_truetrack.str().c_str());
     }
     gr_eta_ai->Draw("alp");
+    gr_eta_ai->GetXaxis()->SetLimits(45., 505.);
+    gr_eta_ai->GetHistogram()->SetMinimum(0.);
     gr_running_avg->Draw("lp");
     //gr_qincone_ai->Draw("lp");
     //gr_qoutcone_ai->Draw("lp");
@@ -2014,10 +2254,10 @@ bool MuonFitter::Execute(){
     c_eta_ai->SetName(ss_eta_ai_name.str().c_str());
 
     TLegend *legend4 = new TLegend(0.55, 0.65, 0.89, 0.89);
-    legend4->AddEntry(gr_eta_ai, "eta", "lp");
+    legend4->AddEntry(gr_eta_ai, "#eta", "lp");
     //legend4->AddEntry(gr_qincone_ai, "inside cone", "lp");
     //legend4->AddEntry(gr_qoutcone_ai, "outside cone", "lp");
-    legend4->AddEntry(gr_running_avg, "running avg eta", "lp");
+    legend4->AddEntry(gr_running_avg, "running avg #eta", "lp");
 
     TLine *lBestFitAi = new TLine(bestFitAi, 0, bestFitAi, max_eta+1);
     lBestFitAi->SetLineColor(2);
@@ -2026,34 +2266,68 @@ bool MuonFitter::Execute(){
     //legend4->AddEntry(lBestFitAi, "best fit", "l");
     if (!isData)
     { //indicate distance btwn trueVtx and tankExitPoint
-      TLine *lTrueTankTrack = new TLine(trueRecoTankTrackLength, 0, trueRecoTankTrackLength, max_eta+1);
+      TLine *lTrueTankTrack = new TLine(trueTrackLengthInWater, 0, trueTrackLengthInWater, max_eta+1);
       lTrueTankTrack->SetLineColor(4);
       lTrueTankTrack->SetLineWidth(2);
-      //lTrueTankTrack->Draw();
-      //legend4->AddEntry(lTrueTankTrack, "true tank track length", "l");
+      if (display_truth)
+      {
+        lTrueTankTrack->Draw();
+        legend4->AddEntry(lTrueTankTrack, "true tank track length", "l");
+      }
 
-      TLine *lLeftAvgEta = new TLine(55, left_avg_eta, trueRecoTankTrackLength, left_avg_eta);
-      lLeftAvgEta->SetLineColor(46);
+      TLine *lLeftAvgEta = new TLine(50, left_avg_eta, trueTrackLengthInWater, left_avg_eta);
+      lLeftAvgEta->SetLineColor(2);
       lLeftAvgEta->SetLineWidth(2);
-      //lLeftAvgEta->Draw();
-      //legend4->AddEntry(lLeftAvgEta, "avg eta left of true track length", "l");
+      if (display_truth)
+      {
+        lLeftAvgEta->Draw();
+        legend4->AddEntry(lLeftAvgEta, "avg #eta to left of true track length", "l");
+      }
 
-      TLine *lRightAvgEta = new TLine(trueRecoTankTrackLength, right_avg_eta, 450, right_avg_eta);
+      TLine *lRightAvgEta = new TLine(trueTrackLengthInWater, right_avg_eta, 455, right_avg_eta);
       lRightAvgEta->SetLineColor(8);
       lRightAvgEta->SetLineWidth(2);
-      //lRightAvgEta->Draw();
-      //legend4->AddEntry(lRightAvgEta, "avg eta right of true track length", "l");
-
-      TLine *lAvgEta = new TLine(55, avg_eta, 450, avg_eta);
-      lAvgEta->SetLineColor(5);
-      lAvgEta->SetLineWidth(2);
-      lAvgEta->Draw();
-      legend4->AddEntry(lAvgEta, "avg eta", "l");
+      if (display_truth)
+      {
+        lRightAvgEta->Draw();
+        legend4->AddEntry(lRightAvgEta, "avg #eta to right of true track length", "l");
+      }
     }
+    TLine *lAvgEta = new TLine(55, avg_eta, 500-deltaL/2, avg_eta);
+    lAvgEta->SetLineColor(46);
+    lAvgEta->SetLineWidth(2);
+    lAvgEta->Draw();
+    legend4->AddEntry(lAvgEta, "avg #eta", "l");
     legend4->Draw();
     c_eta_ai->Write();
+    if (!isData && display_truth) ss_eta_ai_name << "_truth";
     ss_eta_ai_name << ".png";
     c_eta_ai->SaveAs(ss_eta_ai_name.str().c_str());
+
+    
+    c_h_tzero->cd();
+    std::stringstream ss_t0_title, ss_t0_name;
+    ss_t0_title << "t0" << " p" << partnumber << "_ev";
+    ss_t0_name << "c_h_tzero_p" << partnumber << "_ev";
+    if (isData)
+    {
+      ss_t0_title << evnum;
+      ss_t0_name << evnum;
+    }
+    else
+    {
+      ss_t0_title << mcevnum;
+      ss_t0_name << mcevnum;
+    }
+    h_tzero->Draw();
+    c_h_tzero->Modified();
+    c_h_tzero->Update();
+    c_h_tzero->SetTitle(ss_t0_title.str().c_str());
+    if (!isData && display_truth) ss_t0_name << "_truth";
+    c_h_tzero->SetName(ss_t0_name.str().c_str());
+    c_h_tzero->Write();
+    ss_t0_name << ".png";
+    if (fit_mode) c_h_tzero->SaveAs(ss_t0_name.str().c_str());
   }
 
   return true;
@@ -2066,9 +2340,9 @@ bool MuonFitter::Finalise(){
   h_alpha->Write();
   h_expected_PE->Write();
   h_phot_inc_angle->Write();
-  h_hit_angles->Write();
-  h_fitted_tank_track_len->Write();
-  h_closest_approach->Write();
+  //h_hit_angles->Write();
+  //h_fitted_tank_track_len->Write();
+  //h_closest_approach->Write();
   //h_num_mrd_layers->Write();
   //h_clusterhit_x->Write();
   //h_clusterhit_y->Write();
@@ -2078,20 +2352,46 @@ bool MuonFitter::Finalise(){
   //h_clusterhit_time->Write();
   if (!isData)
   {
-    h_lastvtx_z->Write();
+    //h_lastvtx_z->Write();
+    //h_truevtx_z->Write();
+    //h_truevtx_angle->Write();
+    h_true_tanktrack_len->Write();
+    h_truevtx_x->Write();
+    h_truevtx_y->Write();
     h_truevtx_z->Write();
-    h_truevtx_angle->Write();
+    h_topview_truth->Write();
+    h_sideview_truth->Write();
   }
-  h_tankexit_to_pmt->Write();
-  h_tanktrack_ai->Write();
+  //h_tankexit_to_pmt->Write();
+  //h_tanktrack_ai->Write();
   h_eff_area_pmt->Write();
   h_fpmt->Write();
   //h_eta_ai->Write();
-  h_qincone_truevtx->Write();
-  h_qoutcone_truevtx->Write();
+  //h_qincone_truevtx->Write();
+  //h_qoutcone_truevtx->Write();
   //h_total_pe_hits->Write();
   h_truevtx_recoexit_track->Write();
   h_pmt_charge->Write();
+  h_charge_detkey->Write();
+  //h_tdiff->Write();
+  if (fit_mode)
+  {
+    h_uber_t0widths->Write();
+    h_fitted_track_len->Write();
+    h_vtxfit_x->Write();
+    h_vtxfit_y->Write();
+    h_vtxfit_z->Write();
+    h_topview_fit->Write();
+    h_sideview_fit->Write();
+    if (!isData)
+    {
+      h_truefit_len_diff->Write();
+      h_truefitdiff_x->Write();
+      h_truefitdiff_y->Write();
+      h_truefitdiff_z->Write();
+      h_deltaR->Write();
+    }
+  }
 
   // Close 3D canvas
   if (plot3d)
@@ -2109,12 +2409,13 @@ bool MuonFitter::Finalise(){
   delete c_effarea_ai;
   delete c_fpmt_ai;
   delete c_eta_ai;
+  delete c_h_tzero;
 
   root_outp->Close();
-  //pos_file.close();
+  pos_file.close();
   //cpp_file.close();
   pehits_file.close();
-  lravg_file.close();
+  if (!isData && display_truth) truetrack_file.close();
 
   Log("MuonFitter Tool: Exiting", v_message, verbosity);
   return true;
@@ -2189,4 +2490,35 @@ void MuonFitter::reset_3d()
   canvas_3d->Modified();
   canvas_3d->Update();
 
+}
+
+bool MuonFitter::FileExists(std::string fname)
+{
+  ifstream myfile(fname.c_str());
+  return myfile.good();
+}
+
+void MuonFitter::LoadTankTrackFits()
+{
+  ifstream myfile(tankTrackFitFile.c_str());
+  std::cout << "opened file" << std::endl;
+  std::string line;
+  if (myfile.is_open())
+  {
+    // Loop over lines, get event id, fit (should only be one line here)
+    while (getline(myfile, line))
+    {
+      //if (verbosity > 3) std::cout << line << std::endl; //has our stuff
+      if (line.find("#") != std::string::npos) continue;
+      std::vector<std::string> fileLine;
+      boost::split(fileLine, line, boost::is_any_of(","), boost::token_compress_on);
+      std::string event_id = "";
+      double tank_track_fit = -9999.;
+      event_id = fileLine.at(0);
+      tank_track_fit = std::stod(fileLine.at(1));
+      //if (verbosity > 4) std::cout << "event_id, tank_track_fit: " << event_id << " , " << tank_track_fit << std::endl;
+      m_tank_track_fits.insert(std::pair<std::string,double>(event_id, tank_track_fit));
+    }
+  }
+  return;
 }

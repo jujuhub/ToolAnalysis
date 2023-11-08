@@ -5,6 +5,7 @@
 #include <string>
 #include <iostream>
 //#include <unordered_map>
+#include <boost/algorithm/string.hpp>
 
 #include "Tool.h"
 
@@ -29,6 +30,7 @@
 #include "TGeoNode.h"
 #include "TGeoSphere.h"
 #include "TVirtualGeoTrack.h"
+#include "TLatex.h"
 
 #include "Hit.h"
 
@@ -36,7 +38,7 @@
  * \class MuonFitter
  *
  * $ Author: J.He              $
- * $ Date: 2023/01/02          $
+ * $ Last Updated: 2023/09/18  $
  * Contact: juhe@ucdavis.edu
 */
 
@@ -51,6 +53,8 @@ class MuonFitter: public Tool {
     bool Finalise();
     Position Line3D(double x1, double y1, double z1, double x2, double y2, double z2, double C, std::string coord);
     void reset_3d();
+    bool FileExists(std::string fname);
+    void LoadTankTrackFits();
 
 
   private:
@@ -88,12 +92,16 @@ class MuonFitter: public Tool {
     double outsideAngle = 5.;
     double PMTQCut = 3.;
     double EtaThreshold = 500.;
+    bool display_truth = false;
+    bool fit_mode = false;
+    std::string tankTrackFitFile;
 
     //text files
     std::ofstream pos_file;
     std::ofstream cpp_file;
     std::ofstream pehits_file;
-    std::ofstream lravg_file;
+    std::ofstream truetrack_file;
+    std::ofstream nhits_trlen_file;
 
     //root,plots
     TFile *root_outp = nullptr;
@@ -110,6 +118,9 @@ class MuonFitter: public Tool {
 
     TCanvas *canvas_ev_display; //test saving of ev displays
     std::map<uint32_t, TCanvas *> m_evdisplays;
+
+    TCanvas *c_h_tzero;
+    TH1D *h_tzero = nullptr;
 
     TGraph *gr_vtx_charge_in = nullptr;
     TGraph *gr_vtx_charge_out = nullptr;
@@ -132,7 +143,6 @@ class MuonFitter: public Tool {
     TH1D *h_fitted_tank_track_len = nullptr;
     TH1D *h_closest_approach = nullptr;
     TH1D *h_num_mrd_layers = nullptr;
-    TH1D *h_truevtx_z = nullptr;
     TH1D *h_lastvtx_z = nullptr;
     TH1D *h_clusterhit_x = nullptr;
     TH1D *h_clusterhit_y = nullptr;
@@ -149,11 +159,31 @@ class MuonFitter: public Tool {
     TH1D *h_qincone_truevtx = nullptr;
     TH1D *h_qoutcone_truevtx = nullptr;
     TH2D *h_total_pe_hits = nullptr;
+    TH2D *h_charge_detkey = nullptr;
     TH1D *h_truevtx_recoexit_track = nullptr;
     TH1D *h_truevtx_trueexit_track = nullptr;
     TH1D *h_pmt_charge = nullptr;
     TH1D *h_lr_avg_eta = nullptr;
     TH1D *h_avg_eta = nullptr;
+    TH1D *h_truefitdiff_x = nullptr;
+    TH1D *h_truefitdiff_y = nullptr;
+    TH1D *h_truefitdiff_z = nullptr;
+    TH1D *h_tdiff = nullptr;
+    TH1D *h_uber_t0widths = nullptr;
+    TH1D *h_true_tanktrack_len = nullptr;
+    TH1D *h_fitted_track_len = nullptr;
+    TH1D *h_truefit_len_diff = nullptr;
+    TH1D *h_vtxfit_x = nullptr;
+    TH1D *h_vtxfit_y = nullptr;
+    TH1D *h_vtxfit_z = nullptr;
+    TH1D *h_truevtx_x = nullptr;
+    TH1D *h_truevtx_y = nullptr;
+    TH1D *h_truevtx_z = nullptr;
+    TH2D *h_topview_fit = nullptr;
+    TH2D *h_topview_truth = nullptr;
+    TH2D *h_sideview_fit = nullptr;
+    TH2D *h_sideview_truth = nullptr;
+    TH1D *h_deltaR = nullptr;
 
     //event variables
     int partnumber;
@@ -168,6 +198,8 @@ class MuonFitter: public Tool {
     double trueDirX, trueDirY, trueDirZ;
     double trueStopVtxX, trueStopVtxY, trueStopVtxZ;
     double trueAngle;
+    double trueTrackLengthInWater;
+    double trueTrackLengthInMRD;
     int nrings;
     std::vector<unsigned int> particles_ring;
 
@@ -201,7 +233,7 @@ class MuonFitter: public Tool {
     Int_t ntracks = 0;
     TVirtualGeoTrack *track = nullptr;
 
-    //maps
+    //maps,vectors
     std::map<int, double> ChannelKeyToSPEMap;
     std::map<unsigned long, vector<Hit>> *tdcdata = nullptr;
     std::map<int, double> m_pmt_area;
@@ -210,6 +242,7 @@ class MuonFitter: public Tool {
     std::map<double, std::vector<Hit>> *m_all_clusters = nullptr;
     std::map<double, std::vector<MCHit>> *m_all_clusters_MC = nullptr;
     std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys = nullptr;
+    std::map<std::string, double> m_tank_track_fits;
     std::vector<MCParticle> *mcParticles = nullptr;
 
     //mrd

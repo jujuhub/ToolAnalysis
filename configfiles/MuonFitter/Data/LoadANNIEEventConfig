@@ -1,4 +1,5 @@
 verbose 0
-FileForListOfInputs ./configfiles/MuonFitter/my_inputs.txt
+FileForListOfInputs ./configfiles/MuonFitter/R2639_single_infile.txt
+#FileForListOfInputs ./configfiles/MuonFitter/my_inputs_R2639.txt
 EventOffset 0
 GlobalEvNr 1

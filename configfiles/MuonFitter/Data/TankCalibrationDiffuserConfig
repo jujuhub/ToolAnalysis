@@ -2,7 +2,7 @@
 
 HitStore Hits			#Options: Hits / MCHits
 OutputDirectory /annie/app/users/jhe/MyToolAnalysis_MFer/
-OutputFile MF_R2630_TCD          #Output root prefix name for the current run
+OutputFile MF_R2639_TCD          #Output root prefix name for the current run
 NBinsTimeTotal 500		#number of bins for summary time histogram
 TimeTotalMin 0		#left limit of range for summary time histogram
 TimeTotalMax 4000		#right limit of range for summary time histogram
