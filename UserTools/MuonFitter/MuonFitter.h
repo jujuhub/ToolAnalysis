@@ -55,6 +55,8 @@ class MuonFitter: public Tool {
     void reset_3d();
     bool FileExists(std::string fname);
     void LoadTankTrackFits();
+    double Calc_dEdx(double muon_T0);
+    double Calc_MrdEnergyLoss(double rng);
 
 
   private:
@@ -70,6 +72,10 @@ class MuonFitter: public Tool {
     double CHER_ANGLE_DEG = 41.;    //[deg] 41 or 42?
     double CHER_ANGLE_RAD = CHER_ANGLE_DEG*TMath::Pi()/180.;   //[rads]
     double ALPHA_FACTOR = PHOTON_DENSITY / (4.*TMath::Pi()*TMath::Sin(CHER_ANGLE_RAD)*TMath::Tan(CHER_ANGLE_RAD));
+    double I_O = 9.200e-5;   //=11.5*8*0.000001
+    double I_H = 1.920e-5;   //=19.2*1*0.000001
+    double I_GD = 5.888e-4;   //=19.2*1*0.000001
+    double I_S = 1.632e-4;    //=10.6*16*0.000001
 
 
     //logging
@@ -160,7 +166,6 @@ class MuonFitter: public Tool {
     TH1D *h_qoutcone_truevtx = nullptr;
     TH2D *h_total_pe_hits = nullptr;
     TH2D *h_charge_detkey = nullptr;
-    TH1D *h_truevtx_recoexit_track = nullptr;
     TH1D *h_truevtx_trueexit_track = nullptr;
     TH1D *h_pmt_charge = nullptr;
     TH1D *h_lr_avg_eta = nullptr;
@@ -184,6 +189,18 @@ class MuonFitter: public Tool {
     TH2D *h_sideview_fit = nullptr;
     TH2D *h_sideview_truth = nullptr;
     TH1D *h_deltaR = nullptr;
+    TH1D *h_transverse = nullptr;
+    TH1D *h_parallel = nullptr;
+    TH1D *h_deltaR_4pi = nullptr;
+    TH2D *h_true_reco_E = nullptr;
+    TH1D *h_true_reco_Ediff = nullptr;
+    TH2D *h_tank_mrd_E = nullptr;
+    TH2D *h_Ediff_frac_tank = nullptr;
+    TH2D *h_Ediff_frac_mrd = nullptr;
+    TH1D *h_mrd_eloss_diff = nullptr;
+    TH2D *h_mrd_eloss_SBvANNIE = nullptr;
+    TH1D *h_true_reco_Ediff_sb = nullptr;
+    TH1D *h_true_reco_Ediff_sb_outerE = nullptr;
 
     //event variables
     int partnumber;
@@ -200,8 +217,10 @@ class MuonFitter: public Tool {
     double trueAngle;
     double trueTrackLengthInWater;
     double trueTrackLengthInMRD;
+    double trueMuonEnergy;
     int nrings;
     std::vector<unsigned int> particles_ring;
+    std::map<unsigned long, std::vector<Hit>>* m_hits = nullptr;
 
     //geometry
     Geometry *geom = nullptr;

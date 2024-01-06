@@ -15,3 +15,4 @@ RecoDebug_fill 0
 muonTruthRecoDiff_fill 0
 IsData 0
 HasGenie 0
+MuonFitter_fill 1

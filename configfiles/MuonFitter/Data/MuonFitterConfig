@@ -1,6 +1,6 @@
 verbosity 3
 
-OutputFile MuonFitter_R2639_381.root
+OutputFile MuonFitter_R2630.root
 IsData 1                # 0:is data, not MC; 1:not data, is MC
 LuxArea 506.7           # 10-inch R7081 Hamamatsu
 EtelArea 613.1          # 11-inch D784UKFLB ETEL

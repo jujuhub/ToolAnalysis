@@ -7,6 +7,6 @@ myFindMrdTracks FindMrdTracks configfiles/MuonFitter/MC/FindMrdTracksConfig
 myClusterFinder ClusterFinder ./configfiles/MuonFitter/MC/ClusterFinderConfig
 myClusterClassifiers ClusterClassifiers ./configfiles/MuonFitter/MC/ClusterClassifiersConfig
 myEventSelector EventSelector ./configfiles/MuonFitter/MC/EventSelectorConfig
-#myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/MC/PhaseIITreeMakerConfig
 myMuonFitter MuonFitter ./configfiles/MuonFitter/MC/MuonFitterConfig
-myEventDisplay EventDisplay ./configfiles/MuonFitter/MC/EventDisplayConfig
+#myEventDisplay EventDisplay ./configfiles/MuonFitter/MC/EventDisplayConfig
+#myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/MC/PhaseIITreeMakerConfig

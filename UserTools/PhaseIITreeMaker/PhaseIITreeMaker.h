@@ -13,7 +13,6 @@
 #include "TTree.h"
 #include "TH1D.h"
 #include "TMath.h"
-#include "TGraph.h"
 #include "ADCPulse.h"
 #include "Waveform.h"
 #include "CalibratedADCWaveform.h"
@@ -50,7 +49,6 @@ class PhaseIITreeMaker: public Tool {
   void LoadTankClusterHitsMC(std::vector<MCHit> cluster_hits,std::vector<unsigned long> cluster_detkeys);
   bool LoadTankClusterClassifiers(double cluster_time);
   void LoadAllTankHits(bool IsData);
-  void LoadAllTankRecoDigits();
   void LoadSiPMHits();
 
  private:
@@ -128,18 +126,6 @@ class PhaseIITreeMaker: public Tool {
   std::vector<int> fHitChankey;
   std::vector<int> fHitChankeyMC;
 
-  // Tank RecoDigits
-  int fNRecoDigits = 0;
-  std::vector<int> fRecoDigitIsFiltered;
-  std::vector<double> fRecoDigitX;
-  std::vector<double> fRecoDigitY;
-  std::vector<double> fRecoDigitZ;
-  std::vector<double> fRecoDigitT;
-  std::vector<double> fRecoDigitQ; 
-  std::vector<double> fRecoDigitPE; 
-  std::vector<int> fRecoDigitType;
-  std::vector<int> fRecoDigitDetID;
-
   // MRD hit info 
   int fVetoHit;
   std::vector<double> fMRDHitT;
@@ -202,7 +188,7 @@ class PhaseIITreeMaker: public Tool {
   std::vector<bool> fMRDSide;
   std::vector<bool> fMRDStop;
   std::vector<bool> fMRDThrough;
-  
+
   // Trigger-level information
   std::map<std::string,bool> fDataStreams;
   int fTriggerword;
@@ -345,8 +331,12 @@ class PhaseIITreeMaker: public Tool {
   double fDeltaAzimuth;
   double fDeltaZenith;  
   double fDeltaAngle;
-  TGraph *gr_deltaRvAngle; 
   
+  // MuonFitter Vertex
+  double fRecoMuonVtxX;
+  double fRecoMuonVtxY;
+  double fRecoMuonVtxZ;
+  double fRecoTankTrack;
 
   /// \brief Integer that determines the level of logging to perform
   int verbosity = 0;
@@ -362,7 +352,6 @@ class PhaseIITreeMaker: public Tool {
   bool MRDClusterProcessing = 0;
   bool TriggerProcessing = 1;
   bool TankHitInfo_fill = 0;
-  bool TankRecoDigitInfo_fill = 0;
   bool MRDHitInfo_fill = 0;
   bool fillCleanEventsOnly = 0; //Only output events not flagged by EventSelector tool
   bool MCTruth_fill = 0; //Output the MC truth information
@@ -371,6 +360,7 @@ class PhaseIITreeMaker: public Tool {
   bool RecoDebug_fill = 0; //Outputs results of Reconstruction at each step (best fits, FOMs, etc.)
   bool muonTruthRecoDiff_fill = 0; //Output difference in tmuonruth and reconstructed values
   bool SiPMPulseInfo_fill = 0;
+  bool MuonFitter_fill = 0;   //juju
 };
 
 

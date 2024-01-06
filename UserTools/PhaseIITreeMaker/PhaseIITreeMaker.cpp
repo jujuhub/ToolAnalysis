@@ -18,7 +18,6 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("IsData",isData);
   m_variables.Get("HasGenie",hasGenie);
   m_variables.Get("TankHitInfo_fill", TankHitInfo_fill);
-  m_variables.Get("TankRecoDigitInfo_fill", TankRecoDigitInfo_fill);
   m_variables.Get("MRDHitInfo_fill", MRDHitInfo_fill);
   m_variables.Get("fillCleanEventsOnly", fillCleanEventsOnly);
   m_variables.Get("MCTruth_fill", MCTruth_fill);
@@ -31,6 +30,8 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("TankClusterProcessing",TankClusterProcessing);
   m_variables.Get("MRDClusterProcessing",MRDClusterProcessing);
   m_variables.Get("TriggerProcessing",TriggerProcessing);
+
+  m_variables.Get("MuonFitter_fill", MuonFitter_fill);   //juju
 
   std::string output_filename;
   m_variables.Get("OutputFile", output_filename);
@@ -101,6 +102,14 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITankClusterTree->Branch("SiPMNum",&fSiPMNum);
       fPhaseIITankClusterTree->Branch("SiPM1NPulses",&fSiPM1NPulses,"SiPM1NPulses/I");
       fPhaseIITankClusterTree->Branch("SiPM2NPulses",&fSiPM2NPulses,"SiPM2NPulses/I");
+    }
+    //MuonFitter reco vtx and track length; juju
+    if (MuonFitter_fill)
+    {
+      fPhaseIITankClusterTree->Branch("recoMuonVtxX", &fRecoMuonVtxX, "recoMuonVtxX/D");
+      fPhaseIITankClusterTree->Branch("recoMuonVtxY", &fRecoMuonVtxY, "recoMuonVtxY/D");
+      fPhaseIITankClusterTree->Branch("recoMuonVtxZ", &fRecoMuonVtxZ, "recoMuonVtxZ/D");
+      fPhaseIITankClusterTree->Branch("recoTankTrack", &fRecoTankTrack, "recoTankTrack/D");
     }
   } 
 
@@ -214,19 +223,6 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("hitChankey", &fHitChankey);
       fPhaseIITrigTree->Branch("hitChankeyMC",&fHitChankeyMC);
     }
-
-    if(TankRecoDigitInfo_fill){
-      fPhaseIITrigTree->Branch("recoDigitfilter",&fIsFiltered);
-      fPhaseIITrigTree->Branch("recoDigitX",&fRecoDigitX);
-      fPhaseIITrigTree->Branch("recoDigitY",&fRecoDigitY);
-      fPhaseIITrigTree->Branch("recoDigitZ",&fRecoDigitZ);
-      fPhaseIITrigTree->Branch("recoDigitT",&fRecoDigitT);
-      fPhaseIITrigTree->Branch("recoDigitQ",&fRecoDigitQ);
-      fPhaseIITrigTree->Branch("recoDigitPE",&fRecoDigitPE);
-      fPhaseIITrigTree->Branch("recoDigitType", &fRecoDigitType);
-      fPhaseIITrigTree->Branch("recoDigitDetID", &fRecoDigitDetID);
-    }
-
 
     if(MRDHitInfo_fill){
       fPhaseIITrigTree->Branch("MRDhitT",&fMRDHitT);
@@ -404,9 +400,16 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("deltaAzimuth",&fDeltaAzimuth,"deltaAzimuth/D");
       fPhaseIITrigTree->Branch("deltaZenith",&fDeltaZenith,"deltaZenith/D");
       fPhaseIITrigTree->Branch("deltaAngle",&fDeltaAngle,"deltaAngle/D");
-      gr_deltaRvAngle = new TGraph();
-      //fPhaseIITrigTree->Branch("deltaRvAngle",&gr_deltaRvAngle, "deltaVtxR/Zenith");
     } 
+
+    //MuonFitter reco vtx and track length; juju
+    if (MuonFitter_fill)
+    {
+      fPhaseIITrigTree->Branch("recoMuonVtxX", &fRecoMuonVtxX, "recoMuonVtxX/D");
+      fPhaseIITrigTree->Branch("recoMuonVtxY", &fRecoMuonVtxY, "recoMuonVtxY/D");
+      fPhaseIITrigTree->Branch("recoMuonVtxZ", &fRecoMuonVtxZ, "recoMuonVtxZ/D");
+      fPhaseIITrigTree->Branch("recoTankTrack", &fRecoTankTrack, "recoTankTrack/D");
+    }
   }
   return true;
 }
@@ -516,7 +519,7 @@ bool PhaseIITreeMaker::Execute(){
       std::map<unsigned long, std::vector<Waveform<unsigned short>>> raw_waveform_map;
       bool has_raw = m_data->Stores["ANNIEEvent"]->Get("RawADCData",raw_waveform_map);
       if (!has_raw) {
-        Log("PhaseIITreeMaker tool: Did not find RawADCData in ANNIEEvent! Abort",v_error,verbosity);
+        Log("PhaseIITreeMaker tool: Did not find RawADCData in ANNIEEvent! Abort",v_warning,verbosity);
         /*return false;*/
       }
 
@@ -579,6 +582,15 @@ bool PhaseIITreeMaker::Execute(){
       }
 
       if(SiPMPulseInfo_fill) this->LoadSiPMHits();
+      if (MuonFitter_fill)
+      {
+        Position tmp_vtx(-9999,-9999,-9999);
+        m_data->CStore.Get("FittedMuonVertex", tmp_vtx);
+        fRecoMuonVtxX = tmp_vtx.X();
+        fRecoMuonVtxY = tmp_vtx.Y();
+        fRecoMuonVtxZ = tmp_vtx.Z();
+        m_data->CStore.Get("FittedTrackLengthInWater", fRecoTankTrack);
+      }
       fPhaseIITankClusterTree->Fill();
       cluster_num += 1;
       if (isData){
@@ -761,7 +773,8 @@ bool PhaseIITreeMaker::Execute(){
     fPot = beamstat.pot();
  
     m_data->Stores.at("ANNIEEvent")->Get("DataStreams",fDataStreams);
-    m_data->Stores.at("RecoEvent")->Get("PMTMRDCoinc",pmtmrdcoinc);
+    bool get_ok = m_data->Stores.at("RecoEvent")->Get("PMTMRDCoinc",pmtmrdcoinc);
+    if (!get_ok) pmtmrdcoinc = false;
     m_data->Stores.at("RecoEvent")->Get("NoVeto",noveto);
 
     if (pmtmrdcoinc) fTankMRDCoinc = 1;
@@ -783,12 +796,6 @@ bool PhaseIITreeMaker::Execute(){
     if(TankHitInfo_fill){
       this->LoadAllTankHits(isData);
     }
-    // Read RecoDigits and load into ntuple
-    // Should use RecoDigits instead of hits
-    if(TankRecoDigitInfo_fill){
-      this->LoadAllTankRecoDigits();
-    }
-
     if(SiPMPulseInfo_fill) this->LoadSiPMHits();
  
     if(MRDHitInfo_fill) this->LoadAllMRDHits(isData);
@@ -809,14 +816,22 @@ bool PhaseIITreeMaker::Execute(){
 
     bool gotmctruth = false;
     if(MCTruth_fill)  gotmctruth = this->FillMCTruthInfo();
-    
-    cout<<"getreco, getmc = "<<got_reco<<", "<<gotmctruth<<endl;
 
     if (muonTruthRecoDiff_fill) this->FillTruthRecoDiffInfo(gotmctruth,got_reco);
     if (got_reco && gotmctruth && (verbosity>4)) this->RecoSummary();
 
     // FIll tree with all reconstruction information
     if (RecoDebug_fill) this->FillRecoDebugInfo();
+
+    if (MuonFitter_fill)
+    {
+      Position tmp_vtx(-9999,-9999,-9999);
+      m_data->CStore.Get("FittedMuonVertex", tmp_vtx);
+      fRecoMuonVtxX = tmp_vtx.X();
+      fRecoMuonVtxY = tmp_vtx.Y();
+      fRecoMuonVtxZ = tmp_vtx.Z();
+      m_data->CStore.Get("FittedTrackLengthInWater", fRecoTankTrack);
+    }
 
     fPhaseIITrigTree->Fill();
   }
@@ -1035,18 +1050,6 @@ void PhaseIITreeMaker::ResetVariables() {
     fHitChankeyMC.clear();
   }
   
-  if(TankRecoDigitInfo_fill){
-    fRecoDigitIsFiltered.clear();
-    fRecoDigitX.clear();
-    fRecoDigitY.clear();
-    fRecoDigitZ.clear();
-    fRecoDigitT.clear();
-    fRecoDigitQ.clear();
-    fRecoDigitPE.clear();
-    fRecoDigitType.clear();
-    fRecoDigitDetID.clear();
-  }
-
   if (muonTruthRecoDiff_fill){ 
     fDeltaVtxX = -9999;
     fDeltaVtxY = -9999;
@@ -1058,6 +1061,14 @@ void PhaseIITreeMaker::ResetVariables() {
     fDeltaAzimuth = -9999;
     fDeltaZenith = -9999;
     fDeltaAngle = -9999;
+  }
+
+  if (MuonFitter_fill)
+  {
+    fRecoMuonVtxX = -9999;
+    fRecoMuonVtxY = -9999;
+    fRecoMuonVtxZ = -9999;
+    fRecoTankTrack = -9999;
   }
 }
 
@@ -1444,26 +1455,6 @@ void PhaseIITreeMaker::LoadAllTankHits(bool IsData) {
   return;
 }
 
-void PhaseIITreeMaker::LoadAllTankRecoDigits() {
-  std::vector<RecoDigit>* digitList = nullptr;
-  auto get_digits = m_data->Stores.at("RecoEvent")->Get("RecoDigit",digitList);  ///> Get digits from "RecoEvent" 
-  if(!get_digits) {
-    Log("PhaseITreeMaker tool: no digit list in store!", v_error, verbosity);	
-  }
-  else {
-    fNRecoDigits = digitList->size();
-    for( auto& digit : *digitList ){
-      fRecoDigitX.push_back(digit.GetPosition().X());
-      fRecoDigitY.push_back(digit.GetPosition().Y());
-      fRecoDigitZ.push_back(digit.GetPosition().Z());
-      fRecoDigitT.push_back(digit.GetCalTime());      
-      fRecoDigitQ.push_back(digit.GetCalCharge());
-      fRecoDigitType.push_back(digit.GetDigitType());
-      fRecoDigitDetID.push_back(digit.GetDetectorID());
-    }	
-  }
-}
-
 bool PhaseIITreeMaker::FillTankRecoInfo() {
   bool got_reco_info = true;
   auto* reco_event = m_data->Stores["RecoEvent"];
@@ -1834,9 +1825,6 @@ void PhaseIITreeMaker::FillTruthRecoDiffInfo(bool successful_mcload,bool success
     double phi = TMath::ACos(cosphi); // radians
     double TheAngle = phi/(TMath::Pi()/180.0); // radians->degrees
     fDeltaAngle = TheAngle;
-    if(fDeltaVtxR>-2000 &&fDeltaVtxR<2000){
-      gr_deltaRvAngle->SetPoint(fEventNumber, fDeltaVtxR, fRecoPhi/(TMath::Pi()/180.0));
-    }
   }
 }
 

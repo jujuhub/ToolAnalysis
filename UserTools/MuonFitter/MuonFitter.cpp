@@ -138,12 +138,9 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_total_pe_hits->GetXaxis()->SetTitle("# hits");
   h_total_pe_hits->GetYaxis()->SetTitle("# PE");
 
-  h_charge_detkey = new TH2D("h_charge_detkey", "Total PE vs PMT detkey", 134, 331, 465, 500, 0., 1000.);
+  h_charge_detkey = new TH2D("h_charge_detkey", "Total PE vs PMT detkey", 134, 331, 465, 500, 0., 10000.);
   h_charge_detkey->GetXaxis()->SetTitle("detkey");
   h_charge_detkey->GetYaxis()->SetTitle("nPE");
-
-  h_truevtx_recoexit_track = new TH1D("h_truevtx_recoexit_track", "Tank Track Length (true vertex to reco tank exit)", 350, 0, 350);
-  h_truevtx_recoexit_track->GetXaxis()->SetTitle("track length [cm]");
 
   h_truevtx_trueexit_track = new TH1D("h_truevtx_trueexit_track", "Tank Track Length (true vertex to true tank exit)", 350, 0, 350);
   h_truevtx_trueexit_track->GetXaxis()->SetTitle("track length [cm]");
@@ -172,7 +169,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_uber_t0widths = new TH1D("h_uber_t0widths", "Distribution of Timing Distribution Widths", 31, -1., 30.);
   h_uber_t0widths->GetXaxis()->SetTitle("std devs [ns]");
 
-  h_true_tanktrack_len = new TH1D("h_true_tanktrack_len", "Distribution of True Track Lengths", 250, 0, 500);
+  h_true_tanktrack_len = new TH1D("h_true_tanktrack_len", "Distribution of True Track Lengths", 400, 0, 2000);
   h_true_tanktrack_len->GetXaxis()->SetTitle("track length [cm]");
 
   h_fitted_track_len = new TH1D("h_fitted_track_len", "Distribution of Fitted Track Length", 200, 0, 400);
@@ -215,11 +212,50 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_sideview_truth->GetXaxis()->SetTitle("Z [cm]");
   h_sideview_truth->GetYaxis()->SetTitle("Y [cm]");
 
-  h_deltaR = new TH1D("h_deltaR", "#Delta r", 75, 0., 150.);
-  h_deltaR->GetXaxis()->SetTitle("#Delta r [cm]");
+  h_deltaR = new TH1D("h_deltaR", "#Deltar", 75, 0., 150.);
+  h_deltaR->GetXaxis()->SetTitle("#Deltar [cm]");
 
+  h_transverse = new TH1D("h_transverse", "transverse distance", 75, 0., 150.);
+  h_transverse->GetXaxis()->SetTitle("[cm]");
 
-  // Graphs
+  h_parallel = new TH1D("h_parallel", "parallel distance", 75, 0., 150.);
+  h_parallel->GetXaxis()->SetTitle("[cm]");
+
+  h_deltaR_4pi = new TH1D("h_deltaR_4pi", "#Deltar (density corrected)", 75, 0., 150.);
+  h_deltaR_4pi->GetXaxis()->SetTitle("#Deltar");
+  h_deltaR_4pi->GetYaxis()->SetTitle("#frac{n}{4#pir^{2}dr} [cm^{-3}]");
+
+  h_true_reco_E = new TH2D("h_true_reco_E", "Reco vs True #mu Energy (in tank?)", 250, 0., 5000., 250, 0., 5000.);
+  h_true_reco_E->GetXaxis()->SetTitle("TrueE [MeV]");
+  h_true_reco_E->GetYaxis()->SetTitle("RecoE (tank+mrd) [MeV]");
+
+  h_true_reco_Ediff = new TH1D("h_true_reco_Ediff", "Diff in Reco and True #mu Energy", 100, -500, 500);
+  h_true_reco_Ediff->GetXaxis()->SetTitle("recoE - trueE [MeV]");
+
+  h_tank_mrd_E = new TH2D("h_tank_mrd_E", "Reco #mu Energy in Tank vs in MRD", 250, 0., 5000., 250, 0., 5000.);
+  h_tank_mrd_E->GetXaxis()->SetTitle("Reco MrdE [MeV]");
+  h_tank_mrd_E->GetYaxis()->SetTitle("Reco TankE [MeV]");
+
+  h_Ediff_frac_tank = new TH2D("h_Ediff_frac_tank", "#mu Energy Difference (reco - true vs Tank Track Fraction) ", 50, 0., 1., 100, -500, 500);
+  h_Ediff_frac_tank->GetXaxis()->SetTitle("tank track fraction");
+  h_Ediff_frac_tank->GetYaxis()->SetTitle("E diff (reco-true) [MeV]");
+
+  h_Ediff_frac_mrd = new TH2D("h_Ediff_frac_mrd", "#mu Energy Difference (reco - true vs MRD Track Fraction) ", 50, 0., 1., 100, -500, 500);
+  h_Ediff_frac_mrd->GetXaxis()->SetTitle("mrd track fraction");
+  h_Ediff_frac_mrd->GetYaxis()->SetTitle("E diff (reco-true) [MeV]");
+
+  h_mrd_eloss_diff = new TH1D("h_mrd_eloss_diff", "diff in MRD energy loss (SB-ANNIE)", 200, -500, 1500);
+  h_mrd_eloss_diff->GetXaxis()->SetTitle("sb-annie [MeV]");
+
+  h_mrd_eloss_SBvANNIE = new TH2D("h_mrd_eloss_SBvANNIE", "SB vs ANNIE MRD Energy Loss", 250, 0, 5000, 250, 0, 5000);
+  h_mrd_eloss_SBvANNIE->GetXaxis()->SetTitle("annie eloss [MeV]");
+  h_mrd_eloss_SBvANNIE->GetYaxis()->SetTitle("sb eloss [MeV]");
+
+  h_true_reco_Ediff_sb = new TH1D("h_true_reco_Ediff_sb", "#mu Energy Difference (reco-true, SB)", 200, -500, 1500);
+  h_true_reco_Ediff_sb->GetXaxis()->SetTitle("recoE - trueE [MeV]");
+
+  h_true_reco_Ediff_sb_outerE = new TH1D("h_true_reco_Ediff_sb_outerE", "#mu Energy Difference (reco-true, SB)", 200, -500, 1500); 
+  h_true_reco_Ediff_sb_outerE->GetXaxis()->SetTitle("recoE - trueE [MeV]");
 
   // Graphs
   // total charge at ea vtx
@@ -661,7 +697,7 @@ bool MuonFitter::Execute(){
   gr_running_avg->Set(0);
 
   if (h_tzero) h_tzero->Delete();
-  h_tzero = new TH1D("h_tzero", "t0?", 30, -15, 15);
+  h_tzero = new TH1D("h_tzero", "t0?", 60, -15, 15);
   h_tzero->GetXaxis()->SetTitle("[ns]");
 
   avg_eta = 0;
@@ -670,11 +706,15 @@ bool MuonFitter::Execute(){
   num_left_eta = 0;
   num_right_eta = 0;
 
+  m_data->CStore.Set("FittedTrackLengthInWater", -888.);
+  Position dummy_vtx(-888, -888, -888);
+  m_data->CStore.Set("FittedMuonVertex", dummy_vtx);
+
+  int get_ok;
 
   // --------------------------------------------------
   // --- Get event info (data) ------------------------
   // --------------------------------------------------
-  int get_ok;
   if (isData)
   {
     get_ok = m_data->Stores["ANNIEEvent"]->Get("EventNumber", evnum);
@@ -740,11 +780,69 @@ bool MuonFitter::Execute(){
     get_ok = m_data->Stores["RecoEvent"]->Get("TrueTrackLengthInMRD", trueTrackLengthInMRD);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueTrackLengthInMRD from RecoEvent Store!", v_error, verbosity); trueTrackLengthInMRD = -1; }
 
+    get_ok = m_data->Stores["RecoEvent"]->Get("TrueMuonEnergy", trueMuonEnergy);
+    if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueMuonEnergy from RecoEvent Store!", v_error, verbosity); trueMuonEnergy = -1; }
+
     get_ok = m_data->Stores["RecoEvent"]->Get("NRings", nrings);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving NRings, true from RecoEvent!", v_error, verbosity); }
     get_ok = m_data->Stores["RecoEvent"]->Get("IndexParticlesRing", particles_ring);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving IndexParticlesRing, true from RecoEvent!", v_error, verbosity); }
   }
+
+  // --------------------------------------------------
+  // --- Get event info (both) ------------------------
+  // --------------------------------------------------
+  uint32_t trigword;
+  get_ok = m_data->Stores.at("ANNIEEvent")->Get("TriggerWord",trigword);
+  std::cout << "trigword: " << trigword << std::endl;
+
+  // use cosmic triggers to get charge limit on PMTs
+  if (trigword == 36)
+  {
+    //load hits
+    if (isData)
+    {
+      get_ok = m_data->Stores["ANNIEEvent"]->Get("Hits", m_hits);
+      if (!get_ok) std::cout << "MuonFitter Tool: Unable to retrieve hits for this cosmic trigger. "<< std::endl;
+      std::cout << " m_hits size: " << m_hits->size() << std::endl;
+
+      for (std::pair<unsigned long, std::vector<Hit>> &&apair : *m_hits)
+      {
+        //for each detkey and its vector of hits
+        unsigned long chankey = apair.first;
+        std::vector<Hit> &v_hits = apair.second;
+
+        std::map<int, double>::iterator it = ChannelKeyToSPEMap.find(chankey);
+        if (it != ChannelKeyToSPEMap.end())
+        {
+          Detector* this_detector = geom->ChannelToDetector(chankey);
+          unsigned long detkey = this_detector->GetDetectorID();  //chankey same as detkey
+          for (Hit &ahit : v_hits)
+          {
+            double hit_charge = ahit.GetCharge();
+            double hit_PE = hit_charge / ChannelKeyToSPEMap.at(chankey);
+            h_charge_detkey->Fill(detkey, hit_PE);
+
+            //look into large PE hits
+            if (hit_PE > 2000.) 
+            {
+              std::cout << " [debug] found high PE hit! p" << partnumber;
+              if (isData) std::cout << evnum;
+              else std::cout << mcevnum;
+              std::cout << " detkey " << detkey << " with " << hit_PE << "p.e." << std::endl;
+            }
+          }
+        }
+      } //end loop thru m_hits
+    } //end if isData
+    else  //isMC
+    {
+      std::cout << "not cosmic!" << std::endl;
+    }
+  }
+
+  // skip entry if not beam (5)
+  //if (trigword != 5) return true;
 
 
   // --------------------------------------------------
@@ -819,7 +917,10 @@ bool MuonFitter::Execute(){
   // --------------------------------------------------
   // --- Get MRD track params -------------------------
   // --------------------------------------------------
-  double tracklength = 0.;
+  double reco_mrd_track = 0.;
+  bool isMrdStopped;
+  bool isMrdPenetrating;
+  bool isMrdSideExit;
   for(int track_i = 0; track_i < numTracksInEv; track_i++)
   {
     BoostStore* thisTrackAsBoostStore = &(mrdTracks->at(track_i));
@@ -837,7 +938,13 @@ bool MuonFitter::Execute(){
     thisTrackAsBoostStore->Get("EnergyLossError", energyLossError);
     thisTrackAsBoostStore->Get("StartTime", mrdStartTime);
     thisTrackAsBoostStore->Get("TankExitPoint", tankExitPoint);
-    tracklength = sqrt(pow((mrdStopVertex.X()-mrdStartVertex.X()),2)+pow(mrdStopVertex.Y()-mrdStartVertex.Y(),2)+pow(mrdStopVertex.Z()-mrdStartVertex.Z(),2));
+    thisTrackAsBoostStore->Get("IsMrdStopped", isMrdStopped);
+    thisTrackAsBoostStore->Get("IsMrdPenetrating", isMrdPenetrating);
+    thisTrackAsBoostStore->Get("IsMrdSideExit", isMrdSideExit);
+
+    reco_mrd_track = sqrt(pow((mrdStopVertex.X()-mrdStartVertex.X()),2)+pow(mrdStopVertex.Y()-mrdStartVertex.Y(),2)+pow(mrdStopVertex.Z()-mrdStartVertex.Z(),2));
+    reco_mrd_track = reco_mrd_track*100.;       //convert to cm
+    penetrationDepth = penetrationDepth*100.;   //convert to cm
 
     std::cout << "  [debug] mrdStartVertex: " << mrdStartVertex.X() << "," << mrdStartVertex.Y() << "," << mrdStartVertex.Z() << std::endl;
     std::cout << "  [debug] mrdStopVertex: " << mrdStopVertex.X() << "," << mrdStopVertex.Y() << "," << mrdStopVertex.Z() << std::endl;
@@ -846,9 +953,12 @@ bool MuonFitter::Execute(){
     std::cout << "  [debug] trackAngle: " << trackAngle << std::endl;
     std::cout << "  [debug] numLayersHit: " << numLayersHit << std::endl;
     std::cout << "  [debug] penetrationDepth: " << penetrationDepth << std::endl;
-    std::cout << "  [debug] tracklength: " << tracklength << std::endl;
+    std::cout << "  [debug] reco_mrd_track: " << reco_mrd_track << std::endl;
     std::cout << "  [debug] energyLoss: " << energyLoss << std::endl;
     std::cout << "  [debug] mrdStartTime: " << mrdStartTime << std::endl;
+    std::cout << "  [debug] isMrdStopped: " << isMrdStopped << std::endl;
+    std::cout << "  [debug] isMrdPenetrating: " << isMrdPenetrating << std::endl;
+    std::cout << "  [debug] isMrdSideExit: " << isMrdSideExit << std::endl;
 
     //save MRD start/stop coordinates to file
     //pos_file << evnum << "," << mrdStartVertex.X() << ","
@@ -865,6 +975,11 @@ bool MuonFitter::Execute(){
   double tankExitPointY = 100.*(tankExitPoint.Y()-tank_center_y);
   double tankExitPointZ = 100.*(tankExitPoint.Z()-tank_center_z);
   TVector3 tankExit(tankExitPointX, tankExitPointY, tankExitPointZ);
+
+  //#TODO:or use mrdStartVertex?
+  double mrdEntryPointX = 100.*(mrdEntryPoint.X()-tank_center_x);
+  double mrdEntryPointY = 100.*(mrdEntryPoint.Y()-tank_center_y);
+  double mrdEntryPointZ = 100.*(mrdEntryPoint.Z()-tank_center_z);
 
   // Create vectors for MRD start/stop
   TVector3 mrdStart((mrdStartVertex.X()-tank_center_x)*100., (mrdStartVertex.Y()-tank_center_y)*100., (mrdStartVertex.Z()-tank_center_z)*100.);   //[cm]
@@ -887,6 +1002,20 @@ bool MuonFitter::Execute(){
   EXPH->AddNodeOverlap(bBlock,69,new TGeoTranslation(mrdStop.X(), mrdStop.Y(), mrdStop.Z()));
   N++;
 
+  // Select for tracks that end in MRD
+  if (!isMrdStopped)
+  {
+    std::cout << " [debug] MUON DID NOT STOP IN MRD. Skipping..." << std::endl;
+    return true;
+  }
+
+  if (isMrdSideExit)
+  {
+    std::cout << " [debug] MUON EXITTED SIDE OF MRD. Skipping..." << std::endl;
+    //return true;
+  }
+
+
 
   // --------------------------------------------------
   // --- Calculate several vertex candidates ----------
@@ -908,7 +1037,7 @@ bool MuonFitter::Execute(){
       }
       else { vtxCandidates.push_back(v); }
 
-      //check if any vtx intersects with FV
+      //check if any vtx intersects with Fiducial Volume around center
       if (pow(v.X(),2) + pow(v.Y(),2) + pow(v.Z(),2) <= pow(tank_radius*100.-50.,2))
       {
         //std::cout << " [debug] (distance from tank center)^2: " << pow(v.X(),2) + pow(v.Y(),2) + pow(v.Z(),2) << std::endl;
@@ -925,7 +1054,9 @@ bool MuonFitter::Execute(){
     c++;
   } //done calculating vtx candidates
   // make sure track originates in tank
-  if (!inFV) { return true; }
+  if (!inFV) return true;
+
+
 
   std::cout << "MuonFitter Tool: Num of vtxCandidates: " << vtxCandidates.size() << std::endl;
   double l_zmax = vtxCandidates.at(0).Z();
@@ -949,13 +1080,8 @@ bool MuonFitter::Execute(){
   // --------------------------------------------------
   // --- Check short tracks ---------------------------
   // --------------------------------------------------
-  // get distance btwn trueVtx and reco tankExitPoint; not quite trueTrackLengthInWater
-  double trueRecoTankTrackLength = 0.;
   if (!isData)
   {
-    trueRecoTankTrackLength = TMath::Sqrt(pow(tankExitPointX-trueVtxX,2) + pow(tankExitPointY-trueVtxY,2) + pow(tankExitPointZ-trueVtxZ,2));
-    std::cout << " [debug] trueRecoTankTrackLength: " << trueRecoTankTrackLength << std::endl;
-
     // skip if true vertex is downstream of tank
     if (trueVtxZ > 0.)
     {
@@ -965,13 +1091,11 @@ bool MuonFitter::Execute(){
 
     TVector3 trueTankTrack = TVector3(tankExitPointX, tankExitPointY, tankExitPointZ) - TVector3(trueVtxX, trueVtxY, trueVtxZ);
     // skip if tank track is short
-    //if (trueRecoTankTrackLength < 100.)
     if (trueTrackLengthInWater < 100.)
     {
       std::cout << " Track less than 100 cm! SKIPPING! " << mcevnum << std::endl;
       return true;
     }
-    h_truevtx_recoexit_track->Fill(trueRecoTankTrackLength);
 
     double trueTankTrackAngle = trueTankTrack.Angle(TVector3(0,0,1));
     std::cout << " [debug] trueTankTrackAngle: " << trueTankTrackAngle*180./TMath::Pi() << std::endl;
@@ -1174,8 +1298,13 @@ bool MuonFitter::Execute(){
   // save info about main/max cluster
   h_total_pe_hits->Fill(main_cluster_hits, main_cluster_charge);
 
-  double max_eta = 0.;
 
+  // --------------------------------------------------
+  // --- FOUND MUON CANDIDATE -------------------------
+  // --------------------------------------------------
+  double max_eta = 0.;
+  double fitted_track_len = -999.;
+  TVector3 fitted_vtx(-999,-999,-999);
   if (found_muon)
   {
     std::cout << "MuonFitter Tool: Found muon candidate!" << std::endl;
@@ -1201,9 +1330,8 @@ bool MuonFitter::Execute(){
     // --------------------------------------------------
     // --- Fitted tank track ----------------------------
     // --------------------------------------------------
-    //double t0 = -999.;
-    double fitted_track_len = -999.;
-    TVector3 best_fit_vertex;
+    //double fitted_track_len = -999.;
+    //TVector3 fitted_vtx(-999,-999,-999);
     if (fit_mode)
     {
       std::stringstream ev_id;
@@ -1211,6 +1339,7 @@ bool MuonFitter::Execute(){
       if (isData) ev_id << evnum;
       else ev_id << mcevnum;
 
+      // Find the fitted track length for this event
       std::map<std::string, double>::iterator it = m_tank_track_fits.find(ev_id.str());
       if (it != m_tank_track_fits.end())
       {
@@ -1218,21 +1347,111 @@ bool MuonFitter::Execute(){
         std::cout << " [debug] found track for " << ev_id.str() << ": " << fitted_track_len << endl;
         h_fitted_track_len->Fill(fitted_track_len);
 
-        // get the vertex coordinates from fit
-        best_fit_vertex = tankExit - fitted_track_len*mrdTrackDir;  //TODO:draw best fit and true vtx in 3D geo
-        std::cout << " [debug] best_fit_vertex (x,y,z): " << best_fit_vertex.X() << "," << best_fit_vertex.Y() << "," << best_fit_vertex.Z() << std::endl;
-        h_vtxfit_x->Fill(best_fit_vertex.X());
-        h_vtxfit_y->Fill(best_fit_vertex.Y());
-        h_vtxfit_z->Fill(best_fit_vertex.Z());
-        h_topview_fit->Fill(best_fit_vertex.Z(),best_fit_vertex.X());
-        h_sideview_fit->Fill(best_fit_vertex.Z(),best_fit_vertex.Y());
+        //calculate initial MIP energy loss in tank from tank track length
+        double tank_track = fitted_track_len;
+        if (!isData && display_truth)
+        { //check energy calc with true track length in water
+          tank_track = trueTrackLengthInWater;
+        }
+        double dEdx = 2.000;    //1.992 MeV/cm: #TODO:get more accurate conversion
+        double intank_edep = tank_track*dEdx;
+        double outer_track_len = TMath::Sqrt(pow(tankExitPointX-mrdEntryPointX,2) + pow(tankExitPointY-mrdEntryPointY,2) + pow(tankExitPointZ-mrdEntryPointZ,2));
+        double outtank_edep = outer_track_len*dEdx;
+        std::cout << " [debug] outer_track_len: " << outer_track_len << std::endl;
+        std::cout << " [debug] outtank_edep: " << outtank_edep << std::endl;
 
-        if (!isData)
+        // Fine-tune reco muon energy by finding best dE/dx
+        double reco_mu_e = intank_edep + energyLoss + outtank_edep;
+        double T_before = reco_mu_e;
+        bool eres_ok = false;
+        int n_tries = 0;
+        std::cout << " [debug] initial dEdx: " << dEdx << std::endl;
+/*        while (!eres_ok)
+        {
+          double new_dEdx = Calc_dEdx(T_before);
+          std::cout << " [debug] new_dEdx: " << new_dEdx << std::endl;
+          double T_after = tank_track*new_dEdx + energyLoss + outer_track_len*new_dEdx;
+          double E_res = TMath::Abs(T_after-T_before)/T_before;
+          std::cout << " [debug] T_before: " << T_before << std::endl;
+          std::cout << " [debug] T_after: " << T_after << std::endl;
+          std::cout << " [debug] Eres: " << E_res << std::endl;
+          if (E_res <= 0.02)
+          {
+            reco_mu_e = T_after;  //set as new reco muon energy
+            eres_ok = true;
+          }
+          else
+          {
+            T_before = T_after;
+            n_tries++;
+            if (n_tries > 10)
+            {
+              std::cout << " [debug] Did 10 tries!" << std::endl;
+              eres_ok = true;
+            }
+          }
+        } //end while eres_ok loop
+*/
+
+        // Fine-tune reco muon energy by finding dEdx for changing energy after traveling some distance dx
+        double d_tanktrack = fitted_track_len;
+        double dx = 10;   //cm
+        double input_Emu = reco_mu_e;
+        double sum_tank_Emu = 0.;
+        std::cout << " [debug] Calculating muon energy iteratively..." << std::endl;
+        std::cout << " [debug] Initial d_tanktrack: " << d_tanktrack << std::endl;
+        while (d_tanktrack > 0)
+        {
+          if (d_tanktrack < dx)
+          {
+            double deltaE = Calc_dEdx(input_Emu)*d_tanktrack;
+            sum_tank_Emu += deltaE;
+            d_tanktrack -= d_tanktrack;
+            std::cout << " [debug] d_tanktrack: " << d_tanktrack << std::endl;
+          }
+          else
+          {
+            double deltaE = Calc_dEdx(input_Emu)*dx;
+            sum_tank_Emu += deltaE;
+            std::cout << " [debug] dEdx: " << deltaE/dx << std::endl; 
+            std::cout << " [debug] sum_tank_Emu: " << sum_tank_Emu << std::endl; 
+            
+            //calculate new input energy & remaining tank track length
+            input_Emu -= deltaE;
+            d_tanktrack -= dx;
+          }
+        }
+        std::cout << " [debug] Initial reconstructed Emu: " << reco_mu_e << std::endl;
+        reco_mu_e = sum_tank_Emu + energyLoss + outtank_edep;
+        std::cout << " [debug] New reconstructed Emu: " << reco_mu_e << std::endl;
+
+
+        // Use SciBooNE method to determine Edep in MRD
+        double mrd_track = reco_mrd_track;    //using reco mrd track
+        if (!isData && display_truth)
+        {
+          mrd_track = trueTrackLengthInMRD;   //using true mrd track
+        }
+        double mrd_edep_sb = Calc_MrdEnergyLoss(mrd_track);
+        std::cout << " [debug] mrd_edep_sb: " << mrd_edep_sb << std::endl;
+        h_mrd_eloss_diff->Fill(mrd_edep_sb - energyLoss);       //diff btwn SciBooNE method Edep and ANNIE method Edep
+        h_mrd_eloss_SBvANNIE->Fill(energyLoss, mrd_edep_sb);
+
+        // Get the vertex coordinates from fitted track length
+        fitted_vtx = tankExit - fitted_track_len*mrdTrackDir;  //TODO:draw best fit and true vtx in 3D geo
+        std::cout << " [debug] fitted_vtx (x,y,z): " << fitted_vtx.X() << "," << fitted_vtx.Y() << "," << fitted_vtx.Z() << std::endl;
+        h_vtxfit_x->Fill(fitted_vtx.X());
+        h_vtxfit_y->Fill(fitted_vtx.Y());
+        h_vtxfit_z->Fill(fitted_vtx.Z());
+        h_topview_fit->Fill(fitted_vtx.Z(),fitted_vtx.X());
+        h_sideview_fit->Fill(fitted_vtx.Z(),fitted_vtx.Y());
+
+        if (!isData)  //truth info
         {
           std::cout << " [debug] true vertex (x,y,z): " << trueVtxX << "," << trueVtxY << "," << trueVtxZ << std::endl;
-          h_truefitdiff_x->Fill(best_fit_vertex.X()-trueVtxX);
-          h_truefitdiff_y->Fill(best_fit_vertex.Y()-trueVtxY);
-          h_truefitdiff_z->Fill(best_fit_vertex.Z()-trueVtxZ);
+          h_truefitdiff_x->Fill(fitted_vtx.X()-trueVtxX);
+          h_truefitdiff_y->Fill(fitted_vtx.Y()-trueVtxY);
+          h_truefitdiff_z->Fill(fitted_vtx.Z()-trueVtxZ);
           h_truefit_len_diff->Fill(TMath::Abs(fitted_track_len-trueTrackLengthInWater));
           h_truevtx_x->Fill(trueVtxX);
           h_truevtx_y->Fill(trueVtxY);
@@ -1240,15 +1459,52 @@ bool MuonFitter::Execute(){
           h_topview_truth->Fill(trueVtxZ,trueVtxX);
           h_sideview_truth->Fill(trueVtxZ,trueVtxY);
 
-          h_deltaR->Fill(TMath::Sqrt(pow(best_fit_vertex.X()-trueVtxX,2) + pow(best_fit_vertex.Y()-trueVtxY,2) + pow(best_fit_vertex.Z()-trueVtxZ,2)));
-        }
+          // calculcate spatial resolution
+          double deltaR = TMath::Sqrt(pow(fitted_vtx.X()-trueVtxX,2) + pow(fitted_vtx.Y()-trueVtxY,2) + pow(fitted_vtx.Z()-trueVtxZ,2));
+          std::cout << " [debug] deltaR: " << deltaR << std::endl;
+          h_deltaR->Fill(deltaR);
+          TVector3 true_vtx = TVector3(trueVtxX,trueVtxY,trueVtxZ);
+          double transverse = deltaR*TMath::Sin((true_vtx-fitted_vtx).Angle(mrdTrackDir));
+          std::cout << " [debug] transverse: " << transverse << std::endl;
+          h_transverse->Fill(TMath::Abs(transverse));
+          double parallel = deltaR*TMath::Cos((true_vtx-fitted_vtx).Angle(mrdTrackDir));
+          std::cout << " [debug] parallel: " << parallel << std::endl;
+          h_parallel->Fill(TMath::Abs(parallel));
 
-        // look at timing, t0
-        //t0 = fitted_track_len/(30./1.33);
+          // compare with truth info
+          double true_mu_e = trueMuonEnergy - 105.66;
+          double ediff = reco_mu_e - true_mu_e;
+          h_true_reco_E->Fill(true_mu_e, reco_mu_e);
+          h_true_reco_Ediff->Fill(ediff);
+          // compare SciBooNE method of MRD energy deposition
+          h_true_reco_Ediff_sb->Fill((intank_edep + mrd_edep_sb) - true_mu_e);   //using SB method of determining MRD energy dep
+          h_true_reco_Ediff_sb_outerE->Fill((intank_edep + mrd_edep_sb + outtank_edep) - true_mu_e);   //same as above, but with outer track
+
+          // look at fractions of the tank and mrd track lengths
+          double f_tanktrack = (tank_track + outer_track_len)/ (tank_track + outer_track_len + reco_mrd_track);
+          double f_mrdtrack = (reco_mrd_track) / (tank_track + outer_track_len + reco_mrd_track);
+          h_Ediff_frac_tank->Fill(f_tanktrack, ediff);
+          h_Ediff_frac_mrd->Fill(f_mrdtrack, ediff);
+
+        }
+        h_tank_mrd_E->Fill(energyLoss, intank_edep);
       }
       else std::cout << " no fitted track found for: " << ev_id.str() << std::endl;
-    }
 
+/*      std::cout << " [debug] Setting FittedTrackLengthInWater to CStore" << std::endl;
+      m_data->CStore.Set("FittedTrackLengthInWater", fitted_track_len);
+      std::cout << " [debug] Setting FittedMuonVertex to CStore" << std::endl;
+      Position fitted_muon_vtx(fitted_vtx.X(), fitted_vtx.Y(), fitted_vtx.Z());
+      m_data->CStore.Set("FittedMuonVertex", fitted_muon_vtx);
+
+      double test_tracklen = -999.;
+      m_data->CStore.Get("FittedTrackLengthInWater", test_tracklen);
+      std::cout << " [debug] test retrieval of track length from store: " << test_tracklen << std::endl;
+      Position test_vtx(-999, -999, -999);
+      m_data->CStore.Get("FittedMuonVertex", test_vtx);
+      std::cout << " [debug] test retrieval of fitted vertex from store: " << test_vtx.X() << "," << test_vtx.Y() << "," << test_vtx.Z() << std::endl;
+*/
+    }
 
     // --------------------------------------------------
     // METHOD: CALCULATE ai FOR EACH PMT
@@ -1282,7 +1538,7 @@ bool MuonFitter::Execute(){
           double hit_PE = hit_charge / ChannelKeyToSPEMap.at(chankey);
           double hit_time = cluster_hits.at(i).GetTime();
           hittime[detkey].push_back(hit_time);
-          h_charge_detkey->Fill(detkey, hit_PE);
+          //h_charge_detkey->Fill(detkey, hit_PE);
 
           // keep track of total charge seen by each PMT
           charge[detkey] += hit_PE;
@@ -1386,8 +1642,8 @@ bool MuonFitter::Execute(){
       if (fit_mode)
       {
         // check if hit falls inside cone of FITTED vertex
-        TVector3 vtx2tankExit = tankExit - best_fit_vertex;   //similar to ai vector
-        TVector3 vtx2pmt = TVector3(hitX,hitY,hitZ) - best_fit_vertex;
+        TVector3 vtx2tankExit = tankExit - fitted_vtx;   //similar to ai vector
+        TVector3 vtx2pmt = TVector3(hitX,hitY,hitZ) - fitted_vtx;
 
         double ang = vtx2pmt.Angle(mrdTrackDir);
 
@@ -2004,6 +2260,19 @@ bool MuonFitter::Execute(){
   } //end if found_muon
 
 
+  std::cout << " [debug] Setting FittedTrackLengthInWater to CStore " << fitted_track_len << std::endl;
+  m_data->CStore.Set("FittedTrackLengthInWater", fitted_track_len);
+  std::cout << " [debug] Setting FittedMuonVertex to CStore" << std::endl;
+  Position fitted_muon_vtx(fitted_vtx.X(), fitted_vtx.Y(), fitted_vtx.Z());
+  m_data->CStore.Set("FittedMuonVertex", fitted_muon_vtx);
+
+  double test_tracklen = -999.;
+  m_data->CStore.Get("FittedTrackLengthInWater", test_tracklen);
+  std::cout << " [debug] test retrieval of track length from store: " << test_tracklen << std::endl;
+  Position test_vtx(-999, -999, -999);
+  m_data->CStore.Get("FittedMuonVertex", test_vtx);
+  std::cout << " [debug] test retrieval of fitted vertex from store: " << test_vtx.X() << "," << test_vtx.Y() << "," << test_vtx.Z() << std::endl;
+
   // --------------------------------------------------
   // --- Draw event -----------------------------------
   // --------------------------------------------------
@@ -2370,7 +2639,6 @@ bool MuonFitter::Finalise(){
   //h_qincone_truevtx->Write();
   //h_qoutcone_truevtx->Write();
   //h_total_pe_hits->Write();
-  h_truevtx_recoexit_track->Write();
   h_pmt_charge->Write();
   h_charge_detkey->Write();
   //h_tdiff->Write();
@@ -2383,6 +2651,7 @@ bool MuonFitter::Finalise(){
     h_vtxfit_z->Write();
     h_topview_fit->Write();
     h_sideview_fit->Write();
+    h_tank_mrd_E->Write();
     if (!isData)
     {
       h_truefit_len_diff->Write();
@@ -2390,6 +2659,21 @@ bool MuonFitter::Finalise(){
       h_truefitdiff_y->Write();
       h_truefitdiff_z->Write();
       h_deltaR->Write();
+      h_transverse->Write();
+      h_parallel->Write();
+      for (int i = 1; i <= 75; ++i)
+      {
+        h_deltaR_4pi->SetBinContent(i, h_deltaR->GetBinContent(i)/(4.*TMath::Pi()*pow(2*i-1,2)*2.));
+      }
+      h_deltaR_4pi->Write();
+      h_true_reco_E->Write();
+      h_true_reco_Ediff->Write();
+      h_Ediff_frac_tank->Write();
+      h_Ediff_frac_mrd->Write();
+      h_mrd_eloss_diff->Write();
+      h_mrd_eloss_SBvANNIE->Write();
+      h_true_reco_Ediff_sb->Write();
+      h_true_reco_Ediff_sb_outerE->Write();
     }
   }
 
@@ -2521,4 +2805,32 @@ void MuonFitter::LoadTankTrackFits()
     }
   }
   return;
+}
+
+double MuonFitter::Calc_dEdx(double muon_T0)
+{
+  double gamma = muon_T0/105.66;
+  double beta = TMath::Sqrt(gamma*gamma-1.)/gamma;
+  double Tmax = (2.*0.511*beta*beta*gamma*gamma)/(1.+2.*0.511*gamma/105.66 + pow(0.511/105.66,2));
+  double ox_ln = TMath::Log(2.*0.511*beta*beta*gamma*gamma*Tmax/(I_O*I_O));
+  double ox_dEdx = (0.999)*(16./18.)*1*0.307*0.5*pow(1./beta,2)*(0.5*ox_ln-beta*beta-0.5);
+  double h_ln = TMath::Log(2.*0.511*beta*beta*gamma*gamma*Tmax/(I_H*I_H));
+  double h_dEdx = (0.999)*(2./18.)*1*0.307*0.5*pow(1./beta,2)*(0.5*h_ln-beta*beta-0.5);
+
+  // including Gd2(SO4)3
+  double gd_ln = TMath::Log(2.*0.511*beta*beta*gamma*gamma*Tmax/(I_GD*I_GD));
+  double gd_dEdx = (0.001)*(314./602.)*1*0.307*0.5*pow(1./beta,2)*(0.5*gd_ln-beta*beta-0.5);
+  double s_ln = TMath::Log(2.*0.511*beta*beta*gamma*gamma*Tmax/(I_S*I_S));
+  double s_dEdx = (0.001)*(96./602.)*1*0.307*0.5*pow(1./beta,2)*(0.5*s_ln-beta*beta-0.5);
+  double gdox_dEdx = (0.001)*(192./602.)*1*0.307*0.5*pow(1./beta,2)*(0.5*ox_ln-beta*beta-0.5);
+
+  return (ox_dEdx + h_dEdx + gd_dEdx + s_dEdx + gdox_dEdx);
+}
+
+double MuonFitter::Calc_MrdEnergyLoss(double rng)
+{
+  // SciBooNE method of determining energy loss in MRD
+  //assumes rng is in cm
+  //returns energy in MeV
+  return ((0.0982739 + 0.013045*rng)*1.0e3);
 }

@@ -13,8 +13,9 @@ InsideAngle 1.          # degrees added to Cherenkov angle for hits to be consid
 OutsideAngle 9.         # degrees added to Cherenkov angle for hits to be considered outside cone
 PMTChargeThreshold 2    # minimum amount of charge seen by PMT
 EtaThreshold 500        # threshold to find best vertex
-DisplayTruth 0          # display truth information in graphs (only in MC)
+DisplayTruth 1          # display truth information in graphs (only in MC)
 FitMode 1               # run tool after fitting tank track
+#TankTrackFitFile /annie/app/users/jhe/MyToolAnalysis_MFer/fitbyeye_wcsim_0-999_RNN.txt
 TankTrackFitFile /annie/app/users/jhe/MyToolAnalysis_MFer/fitbyeye_wcsim_0-999_merged.txt
 
 Plot3D 1                # 0:no plot; 1:yes plot
