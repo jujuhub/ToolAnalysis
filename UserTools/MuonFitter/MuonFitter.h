@@ -55,8 +55,8 @@ class MuonFitter: public Tool {
     void reset_3d();
     bool FileExists(std::string fname);
     void LoadTankTrackFits();
-    double Calc_dEdx(double muon_T0);
-    double Calc_MrdEnergyLoss(double rng);
+    double CalcTankdEdx(double input_E);
+    double CalcMRDdEdx(double input_E);
 
 
   private:
@@ -76,6 +76,7 @@ class MuonFitter: public Tool {
     double I_H = 1.920e-5;   //=19.2*1*0.000001
     double I_GD = 5.888e-4;   //=19.2*1*0.000001
     double I_S = 1.632e-4;    //=10.6*16*0.000001
+    double I_FE = 2.86e-4;    //=11*26*0.000001
 
 
     //logging
@@ -108,6 +109,7 @@ class MuonFitter: public Tool {
     std::ofstream pehits_file;
     std::ofstream truetrack_file;
     std::ofstream nhits_trlen_file;
+    std::ofstream lg_ediff_file;
 
     //root,plots
     TFile *root_outp = nullptr;
@@ -201,6 +203,12 @@ class MuonFitter: public Tool {
     TH2D *h_mrd_eloss_SBvANNIE = nullptr;
     TH1D *h_true_reco_Ediff_sb = nullptr;
     TH1D *h_true_reco_Ediff_sb_outerE = nullptr;
+    TH1D *h_tank_track_diff_small = nullptr;
+    TH1D *h_tank_track_diff_large = nullptr;
+    TH1D *h_mrd_track_diff_small = nullptr;
+    TH1D *h_mrd_track_diff_large = nullptr;
+    TH1D *h_deltaR_small = nullptr;
+    TH1D *h_deltaR_large = nullptr;
 
     //event variables
     int partnumber;
