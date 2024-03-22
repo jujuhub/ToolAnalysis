@@ -22,6 +22,7 @@
 #include "TPolyMarker.h"
 #include "TTree.h"
 #include "TVector3.h"
+#include "TVectorD.h"
 #include "TPolyLine3D.h"
 #include "TGeoManager.h"
 #include "TGeoMaterial.h"
@@ -31,6 +32,8 @@
 #include "TGeoSphere.h"
 #include "TVirtualGeoTrack.h"
 #include "TLatex.h"
+#include "TMatrixD.h"
+#include "TMatrixDSym.h"
 
 #include "Hit.h"
 
@@ -178,7 +181,7 @@ class MuonFitter: public Tool {
     TH1D *h_tdiff = nullptr;
     TH1D *h_uber_t0widths = nullptr;
     TH1D *h_true_tanktrack_len = nullptr;
-    TH1D *h_fitted_track_len = nullptr;
+    TH1D *h_fitted_tank_track = nullptr;
     TH1D *h_truefit_len_diff = nullptr;
     TH1D *h_vtxfit_x = nullptr;
     TH1D *h_vtxfit_y = nullptr;
@@ -209,6 +212,18 @@ class MuonFitter: public Tool {
     TH1D *h_mrd_track_diff_large = nullptr;
     TH1D *h_deltaR_small = nullptr;
     TH1D *h_deltaR_large = nullptr;
+    TH2D *h_mrd_nlyrs_reco = nullptr;
+    TH1D *h_mrd_track_diff = nullptr;
+    TH1D *h_mrd_angle_diff = nullptr;
+    TH1D *h_mrd_angle = nullptr;
+    TH1D *h_clusterPE = nullptr;
+    TH1D *h_clusterPE_fit = nullptr;
+    TH1D *h_clusterPE_fit_haspion = nullptr;
+    TH1D *h_clusterPE_lrg_ediff = nullptr;
+    TH1D *h_clusterPE_lrg_ediff_haspion = nullptr;
+    TH1D *h_pca_angle = nullptr;
+    TH1D *h_pca_reco_angle = nullptr;
+    TH1D *h_pca_true_angle = nullptr;
 
     //event variables
     int partnumber;
@@ -271,6 +286,8 @@ class MuonFitter: public Tool {
     std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys = nullptr;
     std::map<std::string, double> m_tank_track_fits;
     std::vector<MCParticle> *mcParticles = nullptr;
+    std::vector<int> LayersHit;
+    std::vector<int> PMTsHit;
 
     //mrd
     int numTracksInEv = 0;

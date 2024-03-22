@@ -511,13 +511,6 @@ bool EventDisplay::Execute(){
   if(not get_ok){ Log("EventDisplay tool: Error retrieving RunNumber, true from ANNIEEvent!",v_error,verbose); return false;}
   //get_ok = m_data->Stores["ANNIEEvent"]->Get("SubRunNumber",subrunnumber);
   //if(not get_ok){ Log("EventDisplay tool: Error retrieving SubRunNumber, true from ANNIEEvent!",v_error,verbose); return false;}
-  bool drawEvent = false;
-  get_ok = m_data->CStore.Get("DrawEventDisplay", drawEvent);
-  if (not get_ok)
-  {
-    Log("EventDisplay tool: Unable to retrieve drawEvent", v_error, verbose);
-    if (!run_muon_fitter) drawEvent = true;
-  }
  
   //---------------------------------------------------------------
   //------------------ Get Data related objects -------------------
@@ -544,6 +537,9 @@ bool EventDisplay::Execute(){
     std::string MRDTriggertype;
     get_ok = m_data->Stores.at("ANNIEEvent")->Get("MRDTriggerType",MRDTriggertype);
     if (verbose > 2) std::cout <<"EventDisplay tool: MRDTriggertype is: "<<MRDTriggertype<<std::endl;
+
+    get_ok = m_data->Stores["ANNIEEvent"]->Get("PartNumber",partnumber);
+    if (not get_ok) { Log("EventDisplay tool: Error retrieving PartNumber from ANNIEEvent! Setting to -1.",v_error,verbose); partnumber=-1;}
   }
 
 
@@ -559,7 +555,8 @@ bool EventDisplay::Execute(){
     get_ok = m_data->Stores["ANNIEEvent"]->Get("TDCData",TDCData);  // a std::map<ChannelKey,vector<TDCHit>>
     if(not get_ok){ Log("EventDisplay tool: Error retrieving TDCData, true from ANNIEEvent!",v_error,verbose); return false;}
     get_ok = m_data->Stores["ANNIEEvent"]->Get("MCLAPPDHits",MCLAPPDHits);
-    if(not get_ok){ Log("EventDisplay tool: Error retrieving MCLAPPDHits, true from ANNIEEvent!",v_error,verbose); return false;} 
+    if(not get_ok){ Log("EventDisplay tool: Error retrieving MCLAPPDHits, true from ANNIEEvent!",v_error,verbose); } 
+    //if(not get_ok){ Log("EventDisplay tool: Error retrieving MCLAPPDHits, true from ANNIEEvent!",v_error,verbose); return false;} 
     
     //EventTime currently not implemented in data
     get_ok = m_data->Stores["ANNIEEvent"]->Get("EventTime",EventTime);
@@ -578,6 +575,11 @@ bool EventDisplay::Execute(){
     if(not get_ok){ Log("EventDisplay tool: Error retrieving MCEventNum, true from ANNIEEvent!",v_error,verbose); return false;}
     get_ok = m_data->Stores["ANNIEEvent"]->Get("MCTriggernum",MCTriggernum);
     if(not get_ok){ Log("EventDisplay tool: Error retrieving MCTriggernum, true from ANNIEEvent!",v_error,verbose); return false;}
+    get_ok = m_data->Stores["ANNIEEvent"]->Get("MCFile", mcFile);
+    if(not get_ok){ Log("EventDisplay tool: Error retrieving MCFile, true from ANNIEEvent!",v_error,verbose); mcFile="-1";}
+    std::string delim = ".";
+    std::string tmp_str = mcFile.erase(0, mcFile.find(delim) + delim.length());
+    partnumber = stoi(tmp_str.substr(0, tmp_str.find(delim)));
   
     //Get RecoEvent related variables, related to MC
     //TODO: Add reconstructed versions of vertices and rings 
@@ -750,6 +752,7 @@ bool EventDisplay::Execute(){
     particles_color.clear();
 
     Log("EventDisplay tool: Loop through MCParticles.",v_message,verbose);
+    std::cout << " [debug] nrings: " << nrings << std::endl;
     for(unsigned int particlei=0; particlei<mcparticles->size(); particlei++){
 
       MCParticle aparticle = mcparticles->at(particlei);
@@ -757,6 +760,7 @@ bool EventDisplay::Execute(){
       Log(logmessage,v_message,verbose);
 
       if (std::find(particles_ring.begin(),particles_ring.end(),particlei)!=particles_ring.end()){
+        std::cout << " [debug] drawing particle" << std::endl;
         int pdg_ring = aparticle.GetPdgCode();
         Position vtx_ring = aparticle.GetStartVertex();
         Direction dir_ring = aparticle.GetStartDirection();
@@ -834,7 +838,7 @@ bool EventDisplay::Execute(){
           unsigned long detkey = thistube->GetDetectorID();
           Log("EventDisplay tool: Loop over MCHits: Detkey = "+std::to_string(detkey),v_debug,verbose);
           if (thistube->GetDetectorElement()=="Tank"){
-	    if(thistube->GetTankLocation()=="OD") continue;		//don't plot OD PMTs (they are not included in the final design of ANNIE)
+            if(thistube->GetTankLocation()=="OD") continue;		//don't plot OD PMTs (they are not included in the final design of ANNIE)
             std::vector<MCHit>& Hits = apair.second;
             int hits_pmt = 0;
             int wcsim_id;
@@ -846,6 +850,7 @@ bool EventDisplay::Execute(){
             time[detkey]/=hits_pmt;         //use mean time of all hits on one PMT
             bool passed_lower_time_cut = (threshold_time_low == -999 || time[detkey] >= threshold_time_low);
             bool passed_upper_time_cut = (threshold_time_high == -999 || time[detkey] <= threshold_time_high);
+
             if (charge[detkey] >= threshold && passed_lower_time_cut && passed_upper_time_cut){
               hitpmt_detkeys.push_back(detkey);
               total_hits_pmts++;
@@ -1486,6 +1491,9 @@ bool EventDisplay::Execute(){
   //---------------------------------------------------------------
 
   Log("EventDisplay tool: Drawing Event Display.",v_message,verbose);
+  std::cout << " [debug] p" << partnumber << "_";
+  if (isData) std::cout << evnum << std::endl;
+  else std::cout << mcevnum << std::endl;
 
   canvas_ev_display->Clear();
   canvas_ev_display->Divide(1,1);
@@ -1494,10 +1502,10 @@ bool EventDisplay::Execute(){
   std::stringstream ss_evdisplay_title, ss_evdisplay_name;
   if (!isData){
     ss_evdisplay_title << "evdisplay_ev"<<mcevnum<<"_"<<MCTriggernum;
-    ss_evdisplay_name << "canvas_evdisplay_ev"<<mcevnum<<"_"<<MCTriggernum;
+    ss_evdisplay_name << "canvas_evdisplay_p"<<partnumber<<"_ev"<<mcevnum<<"_"<<MCTriggernum;
   } else {
     ss_evdisplay_title <<"evdisplay_ev"<<evnum;
-    ss_evdisplay_name << "canvas_evdisplay_ev"<<evnum;
+    ss_evdisplay_name << "canvas_evdisplay_p"<<partnumber<<"_ev"<<evnum;
   }
   canvas_ev_display->SetTitle(ss_evdisplay_title.str().c_str());
   canvas_ev_display->SetName(ss_evdisplay_name.str().c_str());
@@ -1547,7 +1555,7 @@ bool EventDisplay::Execute(){
     else {
       Log("EventDisplay tool: Saving canvas to root-file",v_message,verbose);
       root_file->cd();
-      if (drawEvent) canvas_ev_display->Write();
+      canvas_ev_display->Write();
     }
     if (draw_histograms){
       if (output_format == "image"){

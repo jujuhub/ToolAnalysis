@@ -18,6 +18,8 @@
 #include "MRDspecs.hh"
 #include "Detector.h"
 #include "BeamStatus.h"
+#include "TMath.h"
+#include "TVector3.h"
 
 #include "TObjectTable.h"
 
@@ -171,6 +173,9 @@ class LoadWCSim: public Tool {
 	std::string logmessage;
 	int get_ok;
 	
+  //juju
+  TFile *root_outp = nullptr;
+  TH1D *h_dir_diff = nullptr;
 };
 
 

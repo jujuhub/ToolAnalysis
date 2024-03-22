@@ -323,6 +323,13 @@ bool LoadWCSim::Initialise(std::string configfile, DataModel &data){
 	
 	m_data->CStore.Set("UserEvent",false);   //enables the ability for other tools to select a specific event number
 	triggers_event = 0;
+
+  //juju
+  std::string outfile;
+  m_variables.Get("OutputFile", outfile);
+  root_outp = new TFile(outfile.c_str(), "RECREATE");
+  h_dir_diff = new TH1D("h_dir_diff", "Difference btwn Muon Momentum and End Momentum Vector", 200, -10, 10);
+  h_dir_diff->GetXaxis()->SetTitle("[deg]");
 	
 	return true;
 }
@@ -445,40 +452,40 @@ bool LoadWCSim::Execute(){
 					if(verbosity>2) cout<<"getting track "<<tracki<<endl;
 					WCSimRootTrack* nextrack = (WCSimRootTrack*)atrigtt->GetTracks()->At(tracki);
 					/* a WCSimRootTrack has methods:
-					Int_t     GetIpnu()             pdg
-					Int_t     GetFlag()             -1: neutrino primary, -2: neutrino target, 0: other
-					Float_t   GetM()                mass
-					Float_t   GetP()                momentum magnitude
-					Float_t   GetE()                energy (inc rest mass^2)
-					Float_t   GetEndE()             energy on stopping of particle tracking
-					Float_t   GetEndP()             momentum on stopping of particle tracking
-					Int_t     GetStartvol()         starting volume: 10 is tank, 20 is facc, 30 is mrd
-					Int_t     GetStopvol()          stopping volume: but these may not be set.
-					Float_t   GetDir(Int_t i=0)     momentum unit vector
-					Float_t   GetPdir(Int_t i=0)    momentum vector
-					Float_t   GetPdirEnd(Int_t i=0) direction vector on stop tracking
-					Float_t   GetStop(Int_t i=0)    stopping vertex x,y,z for i=0-2, in cm
-					Float_t   GetStart(Int_t i=0)   starting vertex x,y,z for i=0-2, in cm
-					Int_t     GetParenttype()       parent pdg, 0 for primary.
-					Float_t   GetTime()             trj->GetGlobalTime(); starting time of particle
-					Float_t   GetStopTime()
-					Int_t     GetId()               wcsim trackid
-					*/
-					
-					tracktype startstoptype = tracktype::UNDEFINED;
-					//MC particle times are relative to the trigger time
-					if(nextrack->GetFlag()!=0) {
-						if (nextrack->GetFlag()==-1){
-							double starttime, stoptime = -1;
-							if (splitSubtriggers){
-								//MC particle times now stored relative to the trigger time
-								starttime = (static_cast<double>(nextrack->GetTime()-EventTimeNs));
-								         stoptime = (static_cast<double>(nextrack->GetStopTime()-EventTimeNs));
-							} else {
-								starttime = (static_cast<double>(nextrack->GetTime()));
-								         stoptime = (static_cast<double>(nextrack->GetStopTime()));
-							}
-							MCParticle neutrino(
+             Int_t     GetIpnu()             pdg
+             Int_t     GetFlag()             -1: neutrino primary, -2: neutrino target, 0: other
+             Float_t   GetM()                mass
+             Float_t   GetP()                momentum magnitude
+             Float_t   GetE()                energy (inc rest mass^2)
+             Float_t   GetEndE()             energy on stopping of particle tracking
+             Float_t   GetEndP()             momentum on stopping of particle tracking
+             Int_t     GetStartvol()         starting volume: 10 is tank, 20 is facc, 30 is mrd
+             Int_t     GetStopvol()          stopping volume: but these may not be set.
+             Float_t   GetDir(Int_t i=0)     momentum unit vector
+             Float_t   GetPdir(Int_t i=0)    momentum vector
+             Float_t   GetPdirEnd(Int_t i=0) direction vector on stop tracking
+             Float_t   GetStop(Int_t i=0)    stopping vertex x,y,z for i=0-2, in cm
+             Float_t   GetStart(Int_t i=0)   starting vertex x,y,z for i=0-2, in cm
+             Int_t     GetParenttype()       parent pdg, 0 for primary.
+             Float_t   GetTime()             trj->GetGlobalTime(); starting time of particle
+             Float_t   GetStopTime()
+             Int_t     GetId()               wcsim trackid
+             */
+
+          tracktype startstoptype = tracktype::UNDEFINED;
+          //MC particle times are relative to the trigger time
+          if(nextrack->GetFlag()!=0) {
+            if (nextrack->GetFlag()==-1){
+              double starttime, stoptime = -1;
+              if (splitSubtriggers){
+                //MC particle times now stored relative to the trigger time
+                starttime = (static_cast<double>(nextrack->GetTime()-EventTimeNs));
+                stoptime = (static_cast<double>(nextrack->GetStopTime()-EventTimeNs));
+              } else {
+                starttime = (static_cast<double>(nextrack->GetTime()));
+                stoptime = (static_cast<double>(nextrack->GetStopTime()));
+              }
+              MCParticle neutrino(
 							nextrack->GetIpnu(), nextrack->GetE(), nextrack->GetEndE(),
 							Position(nextrack->GetStart(0) / 100.,
 									 nextrack->GetStart(1) / 100.,
@@ -497,6 +504,11 @@ bool LoadWCSim::Execute(){
 							nextrack->GetParenttype(),
 							nextrack->GetFlag(),
 							trigi);
+
+              //juju
+              std::cout << " [debug] neutrino saved direction: " << nextrack->GetDir(0) << "," << nextrack->GetDir(1) << "," << nextrack->GetDir(2) << std::endl;
+              std::cout << " [debug] neutrino momentum vector: " << nextrack->GetPdir(0) << "," << nextrack->GetPdir(1) << "," << nextrack->GetPdir(2) << std::endl;
+              std::cout << " [debug] neutrino end momentum vector: " << nextrack->GetPdirEnd(0) << "," << nextrack->GetPdirEnd(1) << "," << nextrack->GetPdirEnd(2) << std::endl;
 							
 							//Set the neutrino as its own particle
 							m_data->Stores["ANNIEEvent"]->Set("NeutrinoParticle",neutrino);
@@ -606,6 +618,12 @@ bool LoadWCSim::Execute(){
 							+ ", " + to_string(nextrack->GetStop(2)/100.)
 							+ ")";
 						Log(logmessage,v_debug,verbosity);
+
+            //juju
+            std::cout << " [debug] muon saved direction: " << nextrack->GetDir(0) << "," << nextrack->GetDir(1) << "," << nextrack->GetDir(2) << std::endl;
+            std::cout << " [debug] muon momentum vector: " << nextrack->GetPdir(0) << "," << nextrack->GetPdir(1) << "," << nextrack->GetPdir(2) << std::endl;
+            std::cout << " [debug] muon end momentum vector: " << nextrack->GetPdirEnd(0) << "," << nextrack->GetPdirEnd(1) << "," << nextrack->GetPdirEnd(2) << std::endl;
+            h_dir_diff->Fill(TVector3(nextrack->GetPdirEnd(0),nextrack->GetPdirEnd(1),nextrack->GetPdirEnd(2)).Angle(TVector3(0,0,1))*180./TMath::Pi() - TVector3(nextrack->GetPdir(0),nextrack->GetPdir(1),nextrack->GetPdir(2)).Angle(TVector3(0,0,1))*180./TMath::Pi());
 					}
 					
 					trackid_to_mcparticleindex->emplace(nextrack->GetId(),MCParticles->size());
@@ -963,6 +981,11 @@ bool LoadWCSim::Execute(){
 }
 
 bool LoadWCSim::Finalise(){
+  //juju
+  root_outp->cd();
+  h_dir_diff->Write();
+  root_outp->Close();
+
 	WCSimEntry->GetCurrentFile()->Close();
 	delete WCSimEntry;
 	

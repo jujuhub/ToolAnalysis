@@ -154,6 +154,8 @@ class EventDisplay: public Tool {
     std::map<int,int> active_lappds;       // converted to detectorkey
     long cluster_time;
     int triggerword;
+    int partnumber;
+    std::string mcFile;
 
 
     //geometry variables
