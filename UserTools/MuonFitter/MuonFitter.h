@@ -214,6 +214,7 @@ class MuonFitter: public Tool {
     TH1D *h_deltaR_large = nullptr;
     TH2D *h_mrd_nlyrs_reco = nullptr;
     TH1D *h_mrd_track_diff = nullptr;
+    TH1D *h_mrd_track_diff_nlyrs = nullptr;
     TH1D *h_mrd_angle_diff = nullptr;
     TH1D *h_mrd_angle = nullptr;
     TH1D *h_clusterPE = nullptr;
@@ -224,6 +225,8 @@ class MuonFitter: public Tool {
     TH1D *h_pca_angle = nullptr;
     TH1D *h_pca_reco_angle = nullptr;
     TH1D *h_pca_true_angle = nullptr;
+    TH1D *h_total_track_diff = nullptr;
+    TH1D *h_total_track_diff_nlyrs = nullptr;
 
     //event variables
     int partnumber;
@@ -274,6 +277,8 @@ class MuonFitter: public Tool {
     Int_t track_index = 0;
     Int_t ntracks = 0;
     TVirtualGeoTrack *track = nullptr;
+    std::map<unsigned long, std::vector<double>> mrd_x, mrd_y, mrd_z;
+    std::map<unsigned long, double> mrd_center_x, mrd_center_y, mrd_center_z;
 
     //maps,vectors
     std::map<int, double> ChannelKeyToSPEMap;
@@ -287,7 +292,7 @@ class MuonFitter: public Tool {
     std::map<std::string, double> m_tank_track_fits;
     std::vector<MCParticle> *mcParticles = nullptr;
     std::vector<int> LayersHit;
-    std::vector<int> PMTsHit;
+    std::vector<int> MrdPMTsHit;
 
     //mrd
     int numTracksInEv = 0;
