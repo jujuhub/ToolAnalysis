@@ -97,14 +97,18 @@ class MuonFitter: public Tool {
     bool draw3d_mrd = false;
     bool save_hists = false;
     double PMTMRDOffset;
-    double deltaL = 0.;
+    double step_size_ai = 5.;
     double insideAngle = -5.;
     double outsideAngle = 5.;
     double PMTQCut = 3.;
     double EtaThreshold = 500.;
     bool display_truth = false;
-    bool fit_mode = false;
+    bool reco_mode = false;
     std::string tankTrackFitFile;
+    bool use_nlyrs = false;
+    bool use_pca = false;
+    bool use_conn_dots = false;
+    bool use_eloss = true;
 
     //text files
     std::ofstream pos_file;
@@ -118,9 +122,6 @@ class MuonFitter: public Tool {
     TFile *root_outp = nullptr;
     TCanvas *canvas_3d;
     TCanvas *canvas_vtxq;
-    TCanvas *c_vtx_charge;
-    TCanvas *c_vtx_detkey;
-    TCanvas *c_charge_per_pmt;
     TCanvas *c_effarea_detkey;
     TCanvas *c_fpmt_detkey;
     TCanvas *c_effarea_ai;
@@ -133,8 +134,6 @@ class MuonFitter: public Tool {
     TCanvas *c_h_tzero;
     TH1D *h_tzero = nullptr;
 
-    TGraph *gr_vtx_charge_in = nullptr;
-    TGraph *gr_vtx_charge_out = nullptr;
     TGraph *gr_qdensity_in = nullptr;
     TGraph *gr_qdensity_out = nullptr;
     TGraph *gr_vtx_detkey_in = nullptr;
@@ -147,14 +146,12 @@ class MuonFitter: public Tool {
     TGraph *gr_qincone_ai = nullptr;
     TGraph *gr_qoutcone_ai = nullptr;
     TGraph *gr_running_avg = nullptr;
-    TH1D *h_alpha = nullptr;
     TH1D *h_expected_PE = nullptr;
     TH1D *h_phot_inc_angle = nullptr;
     TH1D *h_hit_angles = nullptr;
     TH1D *h_fitted_tank_track_len = nullptr;
     TH1D *h_closest_approach = nullptr;
     TH1D *h_num_mrd_layers = nullptr;
-    TH1D *h_lastvtx_z = nullptr;
     TH1D *h_clusterhit_x = nullptr;
     TH1D *h_clusterhit_y = nullptr;
     TH1D *h_clusterhit_z = nullptr;
@@ -170,7 +167,6 @@ class MuonFitter: public Tool {
     TH1D *h_qincone_truevtx = nullptr;
     TH1D *h_qoutcone_truevtx = nullptr;
     TH2D *h_total_pe_hits = nullptr;
-    TH2D *h_charge_detkey = nullptr;
     TH1D *h_truevtx_trueexit_track = nullptr;
     TH1D *h_pmt_charge = nullptr;
     TH1D *h_lr_avg_eta = nullptr;
@@ -203,9 +199,6 @@ class MuonFitter: public Tool {
     TH2D *h_Ediff_frac_tank = nullptr;
     TH2D *h_Ediff_frac_mrd = nullptr;
     TH1D *h_mrd_eloss_diff = nullptr;
-    TH2D *h_mrd_eloss_SBvANNIE = nullptr;
-    TH1D *h_true_reco_Ediff_sb = nullptr;
-    TH1D *h_true_reco_Ediff_sb_outerE = nullptr;
     TH1D *h_tank_track_diff_small = nullptr;
     TH1D *h_tank_track_diff_large = nullptr;
     TH1D *h_mrd_track_diff_small = nullptr;
@@ -227,6 +220,9 @@ class MuonFitter: public Tool {
     TH1D *h_pca_true_angle = nullptr;
     TH1D *h_total_track_diff = nullptr;
     TH1D *h_total_track_diff_nlyrs = nullptr;
+    TH1D *h_remainder_track_last20MeV = nullptr;
+    TH1D *h_true_reco_Ediff_last20MeV = nullptr;
+    TH2D *h_remainder_track_Ediff_last20MeV = nullptr;
 
     //event variables
     int partnumber;
@@ -240,7 +236,7 @@ class MuonFitter: public Tool {
     double trueVtxX, trueVtxY, trueVtxZ;
     double trueDirX, trueDirY, trueDirZ;
     double trueStopVtxX, trueStopVtxY, trueStopVtxZ;
-    double trueAngle;
+    double trueAngleRad, trueAngleDeg;
     double trueTrackLengthInWater;
     double trueTrackLengthInMRD;
     double trueMuonEnergy;
@@ -284,8 +280,6 @@ class MuonFitter: public Tool {
     std::map<int, double> ChannelKeyToSPEMap;
     std::map<unsigned long, vector<Hit>> *tdcdata = nullptr;
     std::map<int, double> m_pmt_area;
-    std::map<int, double> m_pmt_eff;
-    std::map<int, double> m_pmt_alpha;
     std::map<double, std::vector<Hit>> *m_all_clusters = nullptr;
     std::map<double, std::vector<MCHit>> *m_all_clusters_MC = nullptr;
     std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys = nullptr;
@@ -300,13 +294,13 @@ class MuonFitter: public Tool {
     Position mrdStartVertex;
     Position mrdStopVertex;
     Position tankExitPoint;
-    double trackAngle = -69.;
+    double trackAngleRad = -69., trackAngleDeg = -69.;
     double trackAngleError = -69.;
     double penetrationDepth = -69.;
     Position mrdEntryPoint;
     int numLayersHit = 0;
-    double energyLoss = 0.;
-    double energyLossError = 0.;
+    double mrdEnergyLoss = 0.;
+    double mrdEnergyLossError = 0.;
     double mrdStartTime = -69.;
 
     //misc
@@ -315,7 +309,6 @@ class MuonFitter: public Tool {
     double right_avg_eta;
     int num_left_eta;
     int num_right_eta;
-    double bestFitAi = 0;
 };
 
 
