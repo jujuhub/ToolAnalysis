@@ -25,6 +25,8 @@ bool VtxExtendedVertexFinder::Initialise(std::string configfile, DataModel &data
   m_variables.Get("verbosity", verbosity);
   m_variables.Get("FitTimeWindowMin", fTmin);
   m_variables.Get("FitTimeWindowMax", fTmax);
+  m_variables.Get("UsePDFFile", fUsePDFFile);
+  m_variables.Get("PDFFile", pdffile);
   
   /// Create extended vertex
   /// Note that the objects created by "new" must be added to the "RecoEvent" store. 
@@ -153,7 +155,8 @@ bool VtxExtendedVertexFinder::Finalise(){
 }
 
 RecoVertex* VtxExtendedVertexFinder::FitExtendedVertex(RecoVertex* myVertex) {
-  //fit with Minuit
+  
+	//fit with Minuit
   MinuitOptimizer* myOptimizer = new MinuitOptimizer();
   myOptimizer->SetPrintLevel(-1);
   myOptimizer->SetMeanTimeCalculatorType(1); //Type 1: most probable time
@@ -189,6 +192,14 @@ RecoVertex* VtxExtendedVertexFinder::FitGridSeeds(std::vector<RecoVertex>* vSeed
   RecoVertex* fSimpleVertex = new RecoVertex();
   RecoVertex* bestGridVertex = new RecoVertex(); // FIXME: pointer must be deleted by the invoker
   
+  if (fUsePDFFile) {
+	  bool pdftest = this->GetPDF(pdf);
+	  if (!pdftest) {
+		  Log("pdffile error; continuing with fom reconstruction", v_error, verbosity);
+		  fUsePDFFile = 0;
+	  }
+  }
+
   for( unsigned int n=0; n<nlast; n++ ){
     //Find best time with Minuit
     MinuitOptimizer* myOptimizer = new MinuitOptimizer();
@@ -199,7 +210,13 @@ RecoVertex* VtxExtendedVertexFinder::FitGridSeeds(std::vector<RecoVertex>* vSeed
     fSeedPos = &(vSeedVtxList->at(n));
   	fSimpleVertex= this->FindSimpleDirection(fSeedPos);
     myOptimizer->LoadVertex(fSimpleVertex); //Load vertex seed
-    myOptimizer->FitExtendedVertexWithMinuit(); //scan the point position in 4D space
+    if (!fUsePDFFile) {
+        myOptimizer->FitExtendedVertexWithMinuit(); //scan the point position in 4D space
+    }
+    else {
+        myOptimizer->FitExtendedVertexWithMinuit(pdf);
+    }
+
     vtxFOM = myOptimizer->GetFittedVertex()->GetFOM();
     vtxRecoStatus = myOptimizer->GetFittedVertex()->GetStatus();
  
@@ -215,6 +232,7 @@ RecoVertex* VtxExtendedVertexFinder::FitGridSeeds(std::vector<RecoVertex>* vSeed
     std::cout << "best fit reco status: " << bestGridVertex->GetStatus() << std::endl;
     std::cout << "BestVertex info: " << bestGridVertex->Print() << std::endl;
   }
+
   return bestGridVertex;
 }
 
@@ -308,6 +326,16 @@ void VtxExtendedVertexFinder::PushExtendedVertex(RecoVertex* vtx, bool savetodis
   // push vertex to RecoEvent store
   Log("VtxExtendedVertexFinder Tool: Push extended vertex to the RecoEvent store",v_message,verbosity);
 	m_data->Stores.at("RecoEvent")->Set("ExtendedVertex", fExtendedVertex, savetodisk);
+}
+
+bool VtxExtendedVertexFinder::GetPDF(TH1D& pdf) {
+    TFile f1(pdffile.c_str(), "READ");
+    if (!f1.IsOpen()) {
+        Log("VtxExtendedVertexFinder: pdffile does not exist", v_error, verbosity);
+        return false;
+    }
+    pdf = *(TH1D*)f1.Get("zenith");
+    return true;
 }
 
 void VtxExtendedVertexFinder::Reset() {

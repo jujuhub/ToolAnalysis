@@ -134,7 +134,7 @@ void MCRecoEventLoader::FindTrueVertexFromMC() {
         break;                                         // won't have more than one primary muon
       } else {
 	//Accept both electrons and muons as primary particles, if no selection is specified
-        if( aparticle.GetPdgCode()!=11 && aparticle.GetPdgCode()!=13) continue;
+        if( fabs(aparticle.GetPdgCode())!=11 && fabs(aparticle.GetPdgCode())!=13) continue;
 	primarymuon = aparticle;
 	mufound=true;
 	m_data->Stores.at("RecoEvent")->Set("PdgPrimary",aparticle.GetPdgCode());
@@ -193,6 +193,21 @@ void MCRecoEventLoader::FindTrueVertexFromMC() {
 
 }
 
+void MCRecoEventLoader::FindParticlePdgs(){
+
+  std::vector<int> primary_pdgs;
+  if(fMCParticles){
+    for(unsigned int particlei=0; particlei<fMCParticles->size(); particlei++){
+      MCParticle aparticle = fMCParticles->at(particlei);
+      if(aparticle.GetParentPdg()!=0) continue;      // not a primary particle
+      int pdg_code = aparticle.GetPdgCode();
+      primary_pdgs.push_back(pdg_code);
+    }
+  }
+
+  m_data->Stores.at("RecoEvent")->Set("PrimaryPdgs",primary_pdgs);
+
+}
 
 void MCRecoEventLoader::FindPionKaonCountFromMC() {
 
@@ -273,7 +288,7 @@ void MCRecoEventLoader::FindPionKaonCountFromMC() {
     Log("MCRecoEventLoader::  Tool: No kaons in this event",v_warning,verbosity);
   }
   if (fGetNRings){
-    Log("MCRecoEventLoader: Found "+std::to_string(nrings)+" rings in this event, from "+std::to_string(nprimary)+" primary particles and "+std::to_string(nsecondary)+" secondary particles.");
+    Log("MCRecoEventLoader: Found "+std::to_string(nrings)+" rings in this event, from "+std::to_string(nprimary)+" primary particles and "+std::to_string(nsecondary)+" secondary particles.",2,verbosity);
   }
   //Fill in pion counts for this event
   m_data->Stores.at("RecoEvent")->Set("MCPi0Count", pi0count);

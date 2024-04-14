@@ -82,11 +82,6 @@ bool VtxSeedGenerator::Execute(){
   if (UseSeedGrid) {
 	  Log("VtxSeedGenerator Tool: Generating seed grid", v_debug, verbosity);
 	  this->GenerateSeedGrid(fNumSeeds);
-	  if (fFineGrid) {
-		  Position fFineCenter;
-		  fFineCenter=this->FindCenter();
-		  //this->GenerateFineGrid(fNumSeeds, fFineCenter);
-	  }
   }else {
     Log("VtxSeedGenerator Tool: Generating quadfitter seeds",v_debug,verbosity);
     this->GenerateVertexSeeds(fNumSeeds);
