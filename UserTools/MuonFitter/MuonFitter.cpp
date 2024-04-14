@@ -8,9 +8,12 @@
  *
  * versions:
  * ...
- * 240331v1: fixed line of code defining reco_mu_e (prev defined 
+ * 240331v1JH: fixed line of code defining reco_mu_e (prev defined 
  *           using mrdEnergyLoss)
- * 240401v2: removed unnecessary code, old algorithms
+ * 240401v2JH: removed unnecessary code, old algorithms
+ * 240405v1JH: add option to use simple energy reco (just add eloss)
+ * 240407v1JH: reco mode no longer includes finding muon, added 
+ *              cluster_time to m_tank_track_fits
  * ************************************************************
  */
 
@@ -54,16 +57,19 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("EtaThreshold", EtaThreshold);
   m_variables.Get("DisplayTruth", display_truth);
   m_variables.Get("RecoMode", reco_mode);
+  m_variables.Get("AiEtaFile", aiEtaFile);
   m_variables.Get("TankTrackFitFile", tankTrackFitFile);
   m_variables.Get("UseNumLayers", use_nlyrs);
   m_variables.Get("UsePCA", use_pca);
   m_variables.Get("UseConnDots", use_conn_dots);
   m_variables.Get("UseELoss", use_eloss);
+  m_variables.Get("UseSimpleEReco", use_simple_ereco);
 
   if (use_nlyrs) Log("MuonFitter Tool: Using num layers to determine MRD track length", v_message, verbosity);
   if (use_pca) Log("MuonFitter Tool: Using PCA to determine MRD track angle", v_message, verbosity);
   if (use_conn_dots) Log("MuonFitter Tool: Using connect the dots method to determine MRD track angle", v_message, verbosity);
   if (use_eloss) Log("MuonFitter Tool: Using current ANNIE tools to determine MRD energy loss", v_message, verbosity);
+  if (use_simple_ereco) Log("MuonFitter Tool: Just add tank and MRD energy depositions (don't update dEdx values)", v_message, verbosity);
 
 
   // Output ROOT file
@@ -79,9 +85,9 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   //-- Canvases
   c_effarea_detkey = new TCanvas("c_effarea_detkey", "Effective PMT Area vs detkey", 800, 600);
   c_fpmt_detkey = new TCanvas("c_fpmt_detkey", "Effective PMT Area as Fraction of Frustum Area", 800, 600);
-  c_effarea_ai = new TCanvas("c_effarea_ai", "Effective PMT Area vs ai (tank track)", 800, 600);
+  c_effarea_ai = new TCanvas("c_effarea_ai", "Effective PMT Area vs a_{i} (tank track segment)", 800, 600);
   c_fpmt_ai = new TCanvas("c_fpmt_ai", "Effective PMT Area as Fraction of Frustum Area", 800, 600);
-  c_eta_ai = new TCanvas("c_eta_ai", "Charge per cm (eta)", 800, 600);
+  c_eta_ai = new TCanvas("c_eta_ai", "Charge per cm (#eta)", 800, 600);
   c_h_tzero = new TCanvas("c_h_tzero", "t0", 800, 600);
 
   //-- Histograms
@@ -333,25 +339,6 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   h_remainder_track_Ediff_last20MeV->GetYaxis()->SetTitle("remaining MRD track [cm]");
 
   //-- Graphs
-  // charge per pmt at ea vtx
-  gr_qdensity_in = new TGraph();
-  gr_qdensity_in->SetLineColor(8);
-  gr_qdensity_in->SetLineWidth(2);
-  gr_qdensity_in->SetMarkerStyle(20);
-  gr_qdensity_in->SetMarkerColor(8);
-  gr_qdensity_in->SetFillColor(0);
-  gr_qdensity_in->GetXaxis()->SetTitle("Z [cm]");
-  gr_qdensity_in->GetYaxis()->SetTitle("charge per PMT [#PE]");
-
-  gr_qdensity_out = new TGraph();
-  gr_qdensity_out->SetLineColor(9);
-  gr_qdensity_out->SetLineWidth(2);
-  gr_qdensity_out->SetMarkerStyle(20);
-  gr_qdensity_out->SetMarkerColor(9);
-  gr_qdensity_out->SetFillColor(0);
-  gr_qdensity_out->GetXaxis()->SetTitle("Z [cm]");
-  gr_qdensity_out->GetYaxis()->SetTitle("charge per PMT [#PE]");
-
   // total num of pmts at ea vtx
   gr_vtx_detkey_in = new TGraph();
   gr_vtx_detkey_in->SetLineColor(8);
@@ -409,7 +396,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_eta_ai->SetMarkerColor(46);
   gr_eta_ai->SetFillColor(0);
   gr_eta_ai->GetXaxis()->SetTitle("a_{i} [cm]");
-  gr_eta_ai->GetYaxis()->SetTitle("#eta (nPE/f)");
+  gr_eta_ai->GetYaxis()->SetTitle("#eta (n_{PE}/f)");
 
   gr_running_avg = new TGraph();
   gr_running_avg->SetLineWidth(0);
@@ -418,18 +405,6 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   gr_running_avg->SetFillColor(0);
   gr_running_avg->GetXaxis()->SetTitle("a_{i} [cm]");
   gr_running_avg->GetYaxis()->SetTitle("#eta (nPE/f)");
-
-  gr_qincone_ai = new TGraph();
-  gr_qincone_ai->SetLineWidth(0);
-  gr_qincone_ai->SetMarkerStyle(26);
-  gr_qincone_ai->SetMarkerColor(8);
-  gr_qincone_ai->SetFillColor(0);
-
-  gr_qoutcone_ai = new TGraph();
-  gr_qoutcone_ai->SetLineWidth(0);
-  gr_qoutcone_ai->SetMarkerStyle(32);
-  gr_qoutcone_ai->SetMarkerColor(9);
-  gr_qoutcone_ai->SetFillColor(0);
 
 
   // -------------------------------------------------------------
@@ -592,9 +567,6 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
     mrd_center_y.emplace(detkey,100.*(mrdpaddle->GetOrigin()).Y()-tank_center_y);
     mrd_center_z.emplace(detkey,100.*(mrdpaddle->GetOrigin()).Z()-tank_center_z);
 
-    //-- QA: Print xyz to see if they make sense
-    std::cout << " [debug] MRD center xyz: " << detkey << "," << mrd_center_x[detkey] << "," << mrd_center_y[detkey] << "," << mrd_center_z[detkey] << std::endl;
-
 
     //-- ANNIE in 3D: drawing MRD
     if (draw3d_mrd)
@@ -677,11 +649,12 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   //std::string pos_fname = "posFile.txt";
   //pos_file.open(pos_fname.c_str());
   //pos_file << "##evnum,startX,startY,startZ,stopX,stopY,stopZ" << std::endl;
-  std::string pos_fname = "ev_ai_eta.txt";
+  //std::string pos_fname = "ev_ai_eta.txt";
+  std::string pos_fname = aiEtaFile.c_str();
   pos_file.open(pos_fname.c_str(), std::ostream::app);
   if (!pos_file)
   {
-    std::cout << "File " << pos_fname << " does not exist! Creating now.." << std::endl;
+    std::cout << " [pos_file] File " << pos_fname << " does not exist! Creating now.." << std::endl;
     pos_file.open(pos_fname.c_str());
     pos_file << "##ev_id,cluster_time,ai,eta" << std::endl;
   }
@@ -691,17 +664,17 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   //cpp_file.open(cpp_fname.c_str());
   //cpp_file << "##evnum,nVtx,Qin,Qout,avgSumIn,avgSumOut,avgQin,avgQout" << std::endl;
 
-  std::string pehits_fname = "tot_pe_hits.txt";
+  /*std::string pehits_fname = "tot_pe_hits.txt";
   pehits_file.open(pehits_fname.c_str(), std::ostream::app);
   if (!pehits_file)
   {
     std::cout << "File " << pehits_fname << " does not exist! Creating now..." << std::endl;
     pehits_file.open(pehits_fname.c_str());
     pehits_file << "##partfile,main_cluster_hits,main_cluster_charge" << std::endl;
-  }
+  }*/
 
   //-- Save avg eta to left and right of true tank track length
-  if (!isData && display_truth)
+  if (!isData)
   {
     truetrack_file.open("true_track_len.txt", std::ostream::app);
     if (!truetrack_file)
@@ -713,13 +686,14 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   }
 
   //-- Save fitted_tank_track, nhits, nhits_incone to file
-  nhits_trlen_file.open("nhits_trlen.txt", std::ostream::app);
+  //-- TODO: Get rid of this
+  /*nhits_trlen_file.open("nhits_trlen.txt", std::ostream::app);
   if (!nhits_trlen_file)
   {
     std::cout << "File nhits_trlen.txt does not exist! Creating now..." << std::endl;
     nhits_trlen_file.open("nhits_trlen.txt");
     nhits_trlen_file << "##event_id,track_fit,nhits,nhits_incone,totalpe,totalpe_incone" << std::endl;
-  }
+  }*/
 
   //-- Save info about events with Ediff > 200 MeV
   if (!isData)
@@ -775,8 +749,6 @@ bool MuonFitter::Execute(){
   bool drawEvent = false;   //-- Make graphs for this event (e.g. ev displays, eta vs ai)
   if (plot3d) { reset_3d(); }
 
-  gr_qdensity_in->Set(0);
-  gr_qdensity_out->Set(0);
   gr_effarea_detkey->Set(0);
   gr_fpmt_detkey->Set(0);
   gr_effarea_ai->Set(0);
@@ -877,6 +849,20 @@ bool MuonFitter::Execute(){
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving NRings, true from RecoEvent!", v_error, verbosity); }
     get_ok = m_data->Stores["RecoEvent"]->Get("IndexParticlesRing", particles_ring);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving IndexParticlesRing, true from RecoEvent!", v_error, verbosity); }
+  }
+
+  //-- Get ev_id for matching
+  std::stringstream ev_id;
+  ev_id << "p" << partnumber << "_";
+  if (isData) ev_id << evnum;
+  else ev_id << mcevnum;
+  std::cout << "MuonFitter Tool: Working on event " << ev_id.str() << std::endl;
+
+  if (reco_mode)
+  {
+    //-- Skip events that weren't fitted
+    std::map<std::string, std::vector<double>>::iterator it = m_tank_track_fits.find(ev_id.str());
+    if (it == m_tank_track_fits.end()) return true;
   }
 
   // ------------------------------------------------------------
@@ -1064,11 +1050,6 @@ bool MuonFitter::Execute(){
     Paddle *mrdpaddle = (Paddle *)geom->GetDetectorPaddle(detkey);
     Position position_MRD = mrdpaddle->GetOrigin();
     
-    //-- QA: Check to see if position map is the same
-    std::cout << " [debug] hit pos vs map pos: " << 100.*position_MRD.X()-tank_center_x << "," << mrd_center_x[detkey] << std::endl;
-    std::cout << " [debug] hit pos vs map pos: " << 100.*position_MRD.Y()-tank_center_y << "," << mrd_center_y[detkey] << std::endl;
-    std::cout << " [debug] hit pos vs map pos: " << 100.*position_MRD.Z()-tank_center_z << "," << mrd_center_z[detkey] << std::endl;
-
     fRec_SpacePoint_X.push_back(mrd_center_x[detkey]);
     fRec_SpacePoint_Y.push_back(mrd_center_y[detkey]);
     fRec_SpacePoint_Z.push_back(mrd_center_z[detkey]);
@@ -1350,11 +1331,12 @@ bool MuonFitter::Execute(){
   // ------------------------------------------------------------
   //-- Max charge and in [0..2000ns] time window
   //-- Code based on UserTools/EventDisplay/EventDisplay.cpp
+  bool found_muon = false;
   double main_cluster_time = 0;
   double main_cluster_charge = 0;
   double main_cluster_hits = 0;
 
-  bool found_muon = false;
+  //bool found_muon = false;
   double earliest_hittime = 0;
   std::vector<double> v_cluster_times;
   if (isData)
@@ -1429,9 +1411,6 @@ bool MuonFitter::Execute(){
 
           //-- QA: Check if coordinates are the same. If so, just use existing map
           Position det_pos = this_detector->GetDetectorPosition();
-          std::cout << " [debug] check hit position, map pos: " << 100.*det_pos.X()-tank_center_x << "," << x_pmt[detkey] << std::endl;
-          std::cout << " [debug] check hit position, map pos: " << 100.*det_pos.Y()-tank_center_y << "," << y_pmt[detkey] << std::endl;
-          std::cout << " [debug] check hit position, map pos: " << 100.*det_pos.Z()-tank_center_z << "," << z_pmt[detkey] << std::endl;
         }
       }
 
@@ -1498,9 +1477,10 @@ bool MuonFitter::Execute(){
   // ------------------------------------------------------------
   // --- FOUND MUON CANDIDATE -----------------------------------
   // ------------------------------------------------------------
-  double max_eta = 0.;
-  double fitted_tank_track = -999.;
+  double max_eta = 0.;  //for plotting
 
+  if (!reco_mode)
+  {
   if (found_muon)
   {
     std::cout << "MuonFitter Tool: Found muon candidate! Event: p" << partnumber << "_";
@@ -1509,11 +1489,12 @@ bool MuonFitter::Execute(){
     std::cout << std::endl;
     drawEvent = true;
 
-    //-- Save to txt files
-    pehits_file << "p" << partnumber << "_";
+    //-- Save nhits, cluster_charge to txt files
+    //-- TODO: get rid of this
+    /*pehits_file << "p" << partnumber << "_";
     if (isData) pehits_file << evnum;
     else pehits_file << mcevnum;
-    pehits_file << "," << main_cluster_hits << "," << main_cluster_charge << std::endl;
+    pehits_file << "," << main_cluster_hits << "," << main_cluster_charge << std::endl;*/
 
     //-- Save main cluster charge
     h_clusterPE->Fill(main_cluster_charge);
@@ -1793,17 +1774,20 @@ bool MuonFitter::Execute(){
     }
 
     //-- Save truth info to txt files
-    if (!isData && display_truth)
+    if (!isData)
     {
       truetrack_file << "p" << partnumber << "_" << mcevnum << ",";
-      truetrack_file << trueTrackLengthInWater << "," << left_avg_eta << "," << right_avg_eta << std::endl;
+      truetrack_file << trueTrackLengthInWater << "," << trueTrackLengthInMRD << "," << trueMuonEnergy << std::endl;
+      //truetrack_file << trueTrackLengthInWater << "," << left_avg_eta << "," << right_avg_eta << std::endl;
     }
   } //-- End if found_muon
+  }//-- End !reco_mode
 
 
   // ------------------------------------------------------------
   // --- RECO MODE: Fit tank track, muon energy, vertex ---------
   // ------------------------------------------------------------
+  double fitted_tank_track = -999.;
   TVector3 fitted_vtx(-999,-999,-999);
   if (reco_mode)
   {
@@ -1811,10 +1795,10 @@ bool MuonFitter::Execute(){
     bool save_t0 = false;
 
     //-- Get ev_id for matching
-    std::stringstream ev_id;
+    /*std::stringstream ev_id;
     ev_id << "p" << partnumber << "_";
     if (isData) ev_id << evnum;
-    else ev_id << mcevnum;
+    else ev_id << mcevnum;*/
 
     if (abs(trackAngleRad*180./TMath::Pi()) > 5.)
     {
@@ -1826,14 +1810,17 @@ bool MuonFitter::Execute(){
 
     //-- Get the fitted tank track length for this event from file
     //-- TODO: Load in main_cluster_time << this is how clusters are retrieved
-    std::map<std::string, double>::iterator it = m_tank_track_fits.find(ev_id.str());
+    std::map<std::string, std::vector<double>>::iterator it = m_tank_track_fits.find(ev_id.str());
     if (it != m_tank_track_fits.end())
     {
-      fitted_tank_track = m_tank_track_fits.at(ev_id.str());
-      std::cout << " MuonFitter Tool: Found track for " << ev_id.str() << ": " << fitted_tank_track << endl;
+      std::vector<double> v_fit_ctime = m_tank_track_fits.at(ev_id.str());
+      double fit_cluster_time = (double)v_fit_ctime.at(0);
+      fitted_tank_track = (double)v_fit_ctime.at(1);
+      std::cout << " MuonFitter Tool: Found track, cluster time for " << ev_id.str() << ": " << fitted_tank_track << ", " << fit_cluster_time << endl;
       h_fitted_tank_track->Fill(fitted_tank_track);
 
       //-- Skip the bad fits
+      //-- NOTE: This may no longer be needed if using RNN to fit; might need different cuts
       if (fitted_tank_track < 0) return false;
 
       if (!isData)
@@ -1850,10 +1837,39 @@ bool MuonFitter::Execute(){
 
       //-- Load cluster
       //-- NOTE: For now, can use main_cluster_time since it is in overall scope
+      //
+      double main_cluster_charge = 0.;
+      double main_cluster_nhits = 0.;
       std::vector<Hit> cluster_hits;
       std::vector<MCHit> cluster_hits_MC;
-      if (isData) { cluster_hits = m_all_clusters->at(main_cluster_time); }
-      else { cluster_hits_MC = m_all_clusters_MC->at(main_cluster_time); }
+      if (isData)
+      {
+        // TODO:Add statement to return if couldn't find cluster time (like what SD suggested for DF)
+        for (std::pair<double, std::vector<Hit>>&& apair : *m_all_clusters)
+        {
+          std::cout << " [debug] cluster_times in this event: " << apair.first << std::endl;
+          std::cout << " [debug] diff btwn ctimes (main-ctime): " << fit_cluster_time-apair.first << std::endl;
+          if (to_string(main_cluster_time) == to_string(apair.first)) std::cout << " found match! " << std::endl;
+          else if (apair.first == 947.689) std::cout << " matched 947.689 " << std::endl;
+          else std::cout << " no match found! " << std::endl;
+        }
+        std::cout << " [debug] fitted cluster time: " << fit_cluster_time << std::endl;
+        cluster_hits = m_all_clusters->at(main_cluster_time);
+        main_cluster_nhits = cluster_hits.size();
+        for (int ihit = 0; ihit < cluster_hits.size(); ihit++)
+        {
+          main_cluster_charge += cluster_hits.at(ihit).GetCharge();
+        }
+      }
+      else
+      {
+        cluster_hits_MC = m_all_clusters_MC->at(main_cluster_time);
+        main_cluster_nhits = cluster_hits_MC.size();
+        for (int ihit = 0; ihit < cluster_hits.size(); ihit++)
+        {
+          main_cluster_charge += cluster_hits_MC.at(ihit).GetCharge();
+        }
+      }
       std::vector<unsigned long> cluster_detkeys = m_all_clusters_detkeys->at(main_cluster_time);
 
       //-- Save main cluster charge for fitted events
@@ -2095,6 +2111,13 @@ bool MuonFitter::Execute(){
         reco_mu_e = sum_tank_Emu + sum_mrd_Emu;
         std::cout << " [debug] New reconstructed Emu (after updating MRD): " << reco_mu_e << std::endl;
 
+        if (use_simple_ereco) 
+        {
+          reco_mu_e = tank_edep + mrd_edep;     //-- mrd_edep diff if use_eloss is 1
+          //reco_mu_e = sum_tank_Emu + mrd_edep;   //-- TODO:later do this where tank gets dynamically updated but MRD doesn't
+          std::cout << " [debug] reconstructed Emu (Simple E Reco): " << reco_mu_e << std::endl;
+        }
+
         h_mrd_angle->Fill(trackAngleRad*180./TMath::Pi());    //-- Save the angle of reconstructed event
         h_mrd_eloss_diff->Fill(sum_mrd_Emu - mrdEnergyLoss);  //-- Diff btwn const dE/dx and ANNIE method
 
@@ -2279,10 +2302,13 @@ bool MuonFitter::Execute(){
     canvas_3d->Write();
   }
 
-  //-- Save graphs for fit
-  if (found_muon)
+  //-- Save graphs for fitting
+  if (!reco_mode && found_muon)
   {
-    // area/frustum correction
+    //------------------------------------------------------------
+    //-- Area/frustum correction ---------------------------------
+    //------------------------------------------------------------
+
     c_effarea_detkey->cd();
     std::stringstream ss_effarea_title, ss_effarea_name;
     ss_effarea_title << "Effective PMT Area Ev_";
@@ -2303,6 +2329,11 @@ bool MuonFitter::Execute(){
     c_effarea_detkey->SetTitle(ss_effarea_title.str().c_str());
     c_effarea_detkey->SetName(ss_effarea_name.str().c_str());
     //c_effarea_detkey->Write();
+
+
+    //------------------------------------------------------------
+    //-- Fraction of PMT overlap with ring/frustrum area ---------
+    //------------------------------------------------------------
 
     c_fpmt_detkey->cd();
     std::stringstream ss_fpmt_title, ss_fpmt_name;
@@ -2361,10 +2392,17 @@ bool MuonFitter::Execute(){
     c_fpmt_ai->SetName(ss_fpmt_ai_name.str().c_str());
     c_fpmt_ai->Write();
 
+
+    //------------------------------------------------------------
+    //-- Photon density (eta) vs tank track segment (ai) ---------
+    //------------------------------------------------------------
+
     c_eta_ai->cd();
     std::stringstream ss_eta_title, ss_eta_ai_name, ss_truetrack;
-    ss_eta_title << "Eta: #PE Divided by f (tot PMT charge > " << PMTQCut << ") Ev_";
-    ss_eta_ai_name << "c_eta_ai_p" << partnumber << "_ev";
+    ss_eta_title << "#eta: #PE Divided By f (tot PMT charge > " << PMTQCut << ") Ev_";
+    ss_eta_ai_name << "c_eta_ai";
+    if (isData) ss_eta_ai_name << "_r" << runnumber;
+    ss_eta_ai_name << "_p" << partnumber << "_ev";
     if (isData)
     {
       ss_eta_title << evnum;
@@ -2381,8 +2419,6 @@ bool MuonFitter::Execute(){
     gr_eta_ai->GetXaxis()->SetLimits(45., 505.);
     gr_eta_ai->GetHistogram()->SetMinimum(0.);
     gr_running_avg->Draw("lp");
-    //gr_qincone_ai->Draw("lp");
-    //gr_qoutcone_ai->Draw("lp");
     c_eta_ai->Modified();
     c_eta_ai->Update();
     c_eta_ai->SetTitle(ss_eta_title.str().c_str());
@@ -2390,20 +2426,18 @@ bool MuonFitter::Execute(){
 
     TLegend *legend4 = new TLegend(0.55, 0.65, 0.89, 0.89);
     legend4->AddEntry(gr_eta_ai, "#eta", "lp");
-    //legend4->AddEntry(gr_qincone_ai, "inside cone", "lp");
-    //legend4->AddEntry(gr_qoutcone_ai, "outside cone", "lp");
     legend4->AddEntry(gr_running_avg, "running avg #eta", "lp");
 
     if (!isData)
     { //indicate distance btwn trueVtx and tankExitPoint
-      TLine *lTrueTankTrack = new TLine(trueTrackLengthInWater, 0, trueTrackLengthInWater, max_eta+1);
+      /*TLine *lTrueTankTrack = new TLine(trueTrackLengthInWater, 0, trueTrackLengthInWater, max_eta+1);
       lTrueTankTrack->SetLineColor(4);
       lTrueTankTrack->SetLineWidth(2);
       if (display_truth)
       {
         lTrueTankTrack->Draw();
         legend4->AddEntry(lTrueTankTrack, "true tank track length", "l");
-      }
+      }*/
 
       TLine *lLeftAvgEta = new TLine(50, left_avg_eta, trueTrackLengthInWater, left_avg_eta);
       lLeftAvgEta->SetLineColor(2);
@@ -2433,8 +2467,11 @@ bool MuonFitter::Execute(){
     if (!isData && display_truth) ss_eta_ai_name << "_truth";
     ss_eta_ai_name << ".png";
     c_eta_ai->SaveAs(ss_eta_ai_name.str().c_str());
+  } //-- End !reco_mode
 
     
+  if (reco_mode)
+  {
     c_h_tzero->cd();
     std::stringstream ss_t0_title, ss_t0_name;
     ss_t0_title << "t0" << " p" << partnumber << "_ev";
@@ -2457,7 +2494,7 @@ bool MuonFitter::Execute(){
     c_h_tzero->SetName(ss_t0_name.str().c_str());
     c_h_tzero->Write();
     ss_t0_name << ".png";
-    if (reco_mode) c_h_tzero->SaveAs(ss_t0_name.str().c_str());
+    c_h_tzero->SaveAs(ss_t0_name.str().c_str());
   }
 
   return true;
@@ -2467,8 +2504,8 @@ bool MuonFitter::Execute(){
 bool MuonFitter::Finalise(){
   // Save output
   root_outp->cd();
-  h_expected_PE->Write();
-  h_phot_inc_angle->Write();
+  //h_expected_PE->Write();
+  //h_phot_inc_angle->Write();
   //h_hit_angles->Write();
   //h_fitted_tank_track_len->Write();
   //h_closest_approach->Write();
@@ -2574,8 +2611,8 @@ bool MuonFitter::Finalise(){
   root_outp->Close();
   pos_file.close();
   //cpp_file.close();
-  pehits_file.close();
-  if (!isData && display_truth) truetrack_file.close();
+  //pehits_file.close();
+  if (!isData) truetrack_file.close();
   if (!isData) lg_ediff_file.close();
 
   Log("MuonFitter Tool: Exiting", v_message, verbosity);
@@ -2675,10 +2712,13 @@ void MuonFitter::LoadTankTrackFits()
       boost::split(fileLine, line, boost::is_any_of(","), boost::token_compress_on);
       std::string event_id = "";
       double tank_track_fit = -9999.;
+      double cluster_time = -9999.;
       event_id = fileLine.at(0);
-      tank_track_fit = std::stod(fileLine.at(1));
-      //if (verbosity > 4) std::cout << "event_id, tank_track_fit: " << event_id << " , " << tank_track_fit << std::endl;
-      m_tank_track_fits.insert(std::pair<std::string,double>(event_id, tank_track_fit));
+      cluster_time = std::stod(fileLine.at(1));
+      tank_track_fit = std::stod(fileLine.at(2));
+      std::vector<double> v_fit_ctime{cluster_time, tank_track_fit};
+      if (verbosity > 5) std::cout << "Loading tank track fit: " << event_id << ", " << cluster_time << ", " << tank_track_fit << std::endl;
+      m_tank_track_fits.insert(std::pair<std::string,std::vector<double>>(event_id, v_fit_ctime));
     }
   }
   return;

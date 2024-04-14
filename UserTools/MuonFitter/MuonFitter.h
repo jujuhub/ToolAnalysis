@@ -105,10 +105,12 @@ class MuonFitter: public Tool {
     bool display_truth = false;
     bool reco_mode = false;
     std::string tankTrackFitFile;
+    std::string aiEtaFile;
     bool use_nlyrs = false;
     bool use_pca = false;
     bool use_conn_dots = false;
     bool use_eloss = true;
+    bool use_simple_ereco = false;
 
     //text files
     std::ofstream pos_file;
@@ -283,7 +285,7 @@ class MuonFitter: public Tool {
     std::map<double, std::vector<Hit>> *m_all_clusters = nullptr;
     std::map<double, std::vector<MCHit>> *m_all_clusters_MC = nullptr;
     std::map<double, std::vector<unsigned long>> *m_all_clusters_detkeys = nullptr;
-    std::map<std::string, double> m_tank_track_fits;
+    std::map<std::string, std::vector<double>> m_tank_track_fits;
     std::vector<MCParticle> *mcParticles = nullptr;
     std::vector<int> LayersHit;
     std::vector<int> MrdPMTsHit;
