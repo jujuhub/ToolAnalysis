@@ -175,3 +175,4 @@
 #include "PlotsTrackLengthAndEnergy.h"
 #include "SaveConfigInfo.h"
 #include "ReadConfigInfo.h"
+#include "MuonFitter.h"

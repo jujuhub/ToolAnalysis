@@ -1,0 +1,4 @@
+verbose 0
+FileForListOfInputs ./configfiles/MuonFitter/R2633_single_infile.txt
+EventOffset 0
+GlobalEvNr 1

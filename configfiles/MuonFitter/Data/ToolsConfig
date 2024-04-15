@@ -1,0 +1,10 @@
+myLoadANNIEEvent LoadANNIEEvent ./configfiles/MuonFitter/Data/LoadANNIEEventConfig
+myLoadGeometry LoadGeometry ./configfiles/LoadGeometry/LoadGeometryConfig
+myTimeClustering TimeClustering configfiles/MuonFitter/Data/TimeClusteringConfig
+myFindMrdTracks FindMrdTracks configfiles/MuonFitter/Data/FindMrdTracksConfig
+myClusterFinder ClusterFinder ./configfiles/MuonFitter/Data/ClusterFinderConfig
+myClusterClassifiers ClusterClassifiers ./configfiles/MuonFitter/Data/ClusterClassifiersConfig
+myEventSelector EventSelector ./configfiles/MuonFitter/Data/EventSelectorConfig
+#myEventDisplay EventDisplay ./configfiles/MuonFitter/Data/EventDisplayConfig
+myMuonFitter MuonFitter ./configfiles/MuonFitter/Data/MuonFitterConfig
+#myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/Data/PhaseIITreeMakerConfig

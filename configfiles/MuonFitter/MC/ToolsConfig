@@ -1,0 +1,12 @@
+myLoadGeometry LoadGeometry ./configfiles/LoadGeometry/LoadGeometryConfig
+myLoadWCSim LoadWCSim ./configfiles/MuonFitter/MC/LoadWCSimConfig
+myMCParticleProperties MCParticleProperties ./configfiles/MuonFitter/MC/MCParticlePropertiesConfig
+myMCRecoEventLoader MCRecoEventLoader ./configfiles/MuonFitter/MC/MCRecoEventLoaderConfig
+myTimeClustering TimeClustering configfiles/MuonFitter/MC/TimeClusteringConfig
+myFindMrdTracks FindMrdTracks configfiles/MuonFitter/MC/FindMrdTracksConfig
+myClusterFinder ClusterFinder ./configfiles/MuonFitter/MC/ClusterFinderConfig
+myClusterClassifiers ClusterClassifiers ./configfiles/MuonFitter/MC/ClusterClassifiersConfig
+myEventSelector EventSelector ./configfiles/MuonFitter/MC/EventSelectorConfig
+myMuonFitter MuonFitter ./configfiles/MuonFitter/MC/MuonFitterConfig
+#myEventDisplay EventDisplay ./configfiles/MuonFitter/MC/EventDisplayConfig
+myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/MC/PhaseIITreeMakerConfig
