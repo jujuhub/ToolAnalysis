@@ -1,6 +1,6 @@
 verbosity 5
 
-OutputFile MC_MuonFitter_1.root
+OutputFile MC_MuonFitter_Reco_999.root
 IsData 0                # 0:is data, not MC; 1:not data, is MC
 LuxArea 506.7           # 10-inch R7081 Hamamatsu
 EtelArea 613.1          # 11-inch D784UKFLB ETEL
@@ -15,15 +15,16 @@ PMTChargeThreshold 2    # minimum amount of charge seen by PMT
 EtaThreshold 500        # threshold to find best vertex
 DisplayTruth 0          # display truth information in graphs (only in MC)
 RecoMode 1              # run tool after fitting tank track
-AiEtaFile ev_ai_eta_wcsim_999.txt
-#TankTrackFitFile /annie/app/users/jhe/MyToolAnalysis_MFer/fitbyeye_wcsim_0-999_merged.txt
+AiEtaFile ev_ai_eta_wcsim_0-999.txt
 TankTrackFitFile /annie/app/users/jhe/MyToolAnalysis_MFer/fitbyeye_wcsim_0-999_RNN.txt
+#TankTrackFitFile /annie/app/users/jhe/MyToolAnalysis_MFer/fitbyeye_wcsim_0-999_merged.txt
 
-UseNumLayers 0          # Updates reco track length in MRD using number of layers
+UseNumLayers 1          # Updates reco track length in MRD using number of layers
 UsePCA 0                # Updates reco track length in MRD using number of layers and PCA-reconstructed track angle (set UseNumLayers 1)
 UseConnDots 0           # Updates reco track length in MRD by connecting the MRD hits
-UseELoss 1              # Use official ANNIE MRD energyLoss as starting MRD energy
+UseELoss 0              # Use official ANNIE MRD energyLoss as starting MRD energy
 UseSimpleEReco 0        # Just add ANNIE MRD energyLoss (set UseELoss 1); no updating dEdx
+RecoEnergyShift 145     # Shift reco muon energy
 
 Plot3D 1                # 0:no plot; 1:yes plot
 Draw3DFMV 0

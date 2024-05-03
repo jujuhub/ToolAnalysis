@@ -1,6 +1,6 @@
 #include "MuonFitter.h"
 
-/* ************************************************************
+/* *****************************************************************
  * tool name: MuonFitter
  * author: Julie He
  *
@@ -9,12 +9,13 @@
  * versions:
  * ...
  * 240331v1JH: fixed line of code defining reco_mu_e (prev defined 
- *           using mrdEnergyLoss)
+ *              using mrdEnergyLoss)
  * 240401v2JH: removed unnecessary code, old algorithms
  * 240405v1JH: add option to use simple energy reco (just add eloss)
  * 240407v1JH: reco mode no longer includes finding muon, added 
  *              cluster_time to m_tank_track_fits
- * ************************************************************
+ * 240425v1JH: incorporated scattering effects into MRD track length
+ * *****************************************************************
  */
 
 MuonFitter::MuonFitter():Tool(){}
@@ -64,6 +65,7 @@ bool MuonFitter::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("UseConnDots", use_conn_dots);
   m_variables.Get("UseELoss", use_eloss);
   m_variables.Get("UseSimpleEReco", use_simple_ereco);
+  m_variables.Get("RecoEnergyShift", ERECO_SHIFT);
 
   if (use_nlyrs) Log("MuonFitter Tool: Using num layers to determine MRD track length", v_message, verbosity);
   if (use_pca) Log("MuonFitter Tool: Using PCA to determine MRD track angle", v_message, verbosity);
@@ -771,6 +773,7 @@ bool MuonFitter::Execute(){
   m_data->CStore.Set("FittedTrackLengthInWater", -888.);
   Position dummy_vtx(-888, -888, -888);
   m_data->CStore.Set("FittedMuonVertex", dummy_vtx);
+  m_data->CStore.Set("RecoMuonKE", -888.);
 
 
   // -------------------------------------------------------------
@@ -994,7 +997,7 @@ bool MuonFitter::Execute(){
     std::cout << "  [debug] mrdStartTime: " << mrdStartTime << std::endl;
     std::cout << "  [debug] trackAngleRad: " << trackAngleRad << std::endl;
     std::cout << "  [debug] penetrationDepth: " << penetrationDepth << std::endl;
-    std::cout << "  [debug] reco_mrd_track: " << reco_mrd_track << std::endl;
+    std::cout << "  [debug] reco_mrd_track (ANNIE tools): " << reco_mrd_track << std::endl;
     std::cout << "  [debug] mrdEnergyLoss: " << mrdEnergyLoss << std::endl;
     std::cout << "  [debug] isMrdStopped: " << isMrdStopped << std::endl;
     std::cout << "  [debug] isMrdPenetrating: " << isMrdPenetrating << std::endl;
@@ -1030,7 +1033,7 @@ bool MuonFitter::Execute(){
   nlyrs_mrd_track = 5.*LayersHit.size()/abs(TMath::Cos(trackAngleRad));
 
   //-- Compare MRD tracks reconstructed w/ ANNIE methods and num layers
-  h_mrd_nlyrs_reco->Fill(reco_mrd_track, nlyrs_mrd_track);
+  //h_mrd_nlyrs_reco->Fill(reco_mrd_track, nlyrs_mrd_track);
 
 
   // ------------------------------------------------------------
@@ -1158,6 +1161,11 @@ bool MuonFitter::Execute(){
     std::cout << " [debug] dist_btwn_lyrs: " << dist_btwn_lyrs << std::endl;
     std::cout << " [debug] conn_dots_mrd_track: " << conn_dots_mrd_track << std::endl;
   } //-- Done connecting the dots
+
+  std::cout << " [debug] FINAL conn_dots_mrd_track: " << conn_dots_mrd_track << std::endl;
+  std::cout << " [debug] FINAL nlyrs_mrd_track: " << nlyrs_mrd_track << std::endl;
+  //-- Repurpose hist to compare nlyrs and conn dots
+  h_mrd_nlyrs_reco->Fill(nlyrs_mrd_track, conn_dots_mrd_track);
 
 
 
@@ -1789,12 +1797,13 @@ bool MuonFitter::Execute(){
   // ------------------------------------------------------------
   double fitted_tank_track = -999.;
   TVector3 fitted_vtx(-999,-999,-999);
+  double reco_muon_ke = -999.;
   if (reco_mode)
   {
     double t0 = -999.;
     bool save_t0 = false;
 
-    //-- Get ev_id for matching
+    //-- Get ev_id for matching << this has been moved further up in script
     /*std::stringstream ev_id;
     ev_id << "p" << partnumber << "_";
     if (isData) ev_id << evnum;
@@ -1809,7 +1818,6 @@ bool MuonFitter::Execute(){
     }
 
     //-- Get the fitted tank track length for this event from file
-    //-- TODO: Load in main_cluster_time << this is how clusters are retrieved
     std::map<std::string, std::vector<double>>::iterator it = m_tank_track_fits.find(ev_id.str());
     if (it != m_tank_track_fits.end())
     {
@@ -1829,33 +1837,21 @@ bool MuonFitter::Execute(){
         //h_mrd_angle_diff->Fill(trackAngleDeg - trueAngleDeg);
         h_mrd_track_diff->Fill(reco_mrd_track - trueTrackLengthInMRD);
         //h_mrd_track_diff->Fill(conn_dots_mrd_track - trueTrackLengthInMRD);  //connect dots
-        h_mrd_track_diff_nlyrs->Fill(nlyrs_mrd_track - trueTrackLengthInMRD);
+        //h_mrd_track_diff_nlyrs->Fill(nlyrs_mrd_track - trueTrackLengthInMRD);
+        h_mrd_track_diff_nlyrs->Fill(conn_dots_mrd_track - nlyrs_mrd_track);
         h_total_track_diff->Fill((reco_mrd_track+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
         //h_total_track_diff->Fill((conn_dots_mrd_track+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
         h_total_track_diff_nlyrs->Fill((5.*LayersHit.size()/abs(TMath::Cos(trackAngleRad))+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
       }
 
       //-- Load cluster
-      //-- NOTE: For now, can use main_cluster_time since it is in overall scope
-      //
-      double main_cluster_charge = 0.;
-      double main_cluster_nhits = 0.;
+      //-- NOTE: Must use main_cluster_time from above since precision is lost when saving to file
       std::vector<Hit> cluster_hits;
       std::vector<MCHit> cluster_hits_MC;
       if (isData)
       {
-        // TODO:Add statement to return if couldn't find cluster time (like what SD suggested for DF)
-        for (std::pair<double, std::vector<Hit>>&& apair : *m_all_clusters)
-        {
-          std::cout << " [debug] cluster_times in this event: " << apair.first << std::endl;
-          std::cout << " [debug] diff btwn ctimes (main-ctime): " << fit_cluster_time-apair.first << std::endl;
-          if (to_string(main_cluster_time) == to_string(apair.first)) std::cout << " found match! " << std::endl;
-          else if (apair.first == 947.689) std::cout << " matched 947.689 " << std::endl;
-          else std::cout << " no match found! " << std::endl;
-        }
-        std::cout << " [debug] fitted cluster time: " << fit_cluster_time << std::endl;
         cluster_hits = m_all_clusters->at(main_cluster_time);
-        main_cluster_nhits = cluster_hits.size();
+        //main_cluster_nhits = cluster_hits.size();
         for (int ihit = 0; ihit < cluster_hits.size(); ihit++)
         {
           main_cluster_charge += cluster_hits.at(ihit).GetCharge();
@@ -1864,7 +1860,7 @@ bool MuonFitter::Execute(){
       else
       {
         cluster_hits_MC = m_all_clusters_MC->at(main_cluster_time);
-        main_cluster_nhits = cluster_hits_MC.size();
+        //main_cluster_nhits = cluster_hits_MC.size();
         for (int ihit = 0; ihit < cluster_hits.size(); ihit++)
         {
           main_cluster_charge += cluster_hits_MC.at(ihit).GetCharge();
@@ -1934,7 +1930,7 @@ bool MuonFitter::Execute(){
       double tank_dEdx = 2.000;    //1.992 MeV/cm
       double tank_edep = tank_track * tank_dEdx;
       double tank_mrd_dist = TMath::Sqrt(pow(tankExitPointX-mrdEntryPointX,2) + pow(tankExitPointY-mrdEntryPointY,2) + pow(tankExitPointZ-mrdEntryPointZ,2));
-      double outtank_edep = tank_mrd_dist * tank_dEdx;  //this should be dE/dx in air..
+      double outtank_edep = tank_mrd_dist * 1.05;  //this should be dE/dx in air..; currently not used
       std::cout << " [debug] tank_mrd_dist [cm]: " << tank_mrd_dist << std::endl;
       std::cout << " [debug] outtank_edep: " << outtank_edep << std::endl;
 
@@ -1944,10 +1940,28 @@ bool MuonFitter::Execute(){
       if (use_nlyrs) mrd_track = nlyrs_mrd_track;
       if (use_conn_dots) mrd_track = conn_dots_mrd_track;
 
-      double mrd_dEdx = 10.1;     //MeV/cm
+      double mrd_dEdx = 11.3;     //MeV/cm
       double mrd_edep = mrd_track * mrd_dEdx;
-      if (use_eloss) mrd_edep = mrdEnergyLoss;  //use official ANNIE tool
-      std::cout << " [debug] mrd_edep: " << mrd_edep << std::endl;
+      if (use_eloss) mrd_edep = mrdEnergyLoss;  //use official ANNIE tool reco MRD energy loss as the starting point
+      std::cout << " [debug] mrd_edep: " << mrd_edep << std::endl;  //check which MRD energy is used
+
+      if (use_nlyrs)
+      {
+        std::cout << " [debug] Adjust MRD track length based on initial mrd_edep" << std::endl;
+        if (mrd_edep >= 400.)
+        {
+          mrd_track = mrd_track / 0.95;
+        }
+        else if (mrd_edep < 400.)
+        {
+          mrd_track = mrd_track / 0.80;
+        }
+
+        // Update with new track length
+        mrd_edep = mrd_track * mrd_dEdx;
+        std::cout << " [debug] nlyrs upd mrd_track: " << mrd_track << std::endl;
+        std::cout << " [debug] nlyrs upd mrd_edep: " << mrd_edep << std::endl;
+      }
 
       //-- Get initial reco muon energy by adding tank and MRD energy depositions
       double reco_mu_e = tank_edep + mrd_edep;
@@ -2061,6 +2075,12 @@ bool MuonFitter::Execute(){
             std::cout << " [debug] input_Emu is LESS THAN 20 MeV: " << input_Emu << std::endl;
             std::cout << " [debug] Remaining d_mrdtrack: " << d_mrdtrack << std::endl;
 
+            /*if (use_nlyrs && (d_mrdtrack > dx))
+            {
+              // Up the remaining energy since we still have a lot of track left
+              input_Emu = d_mrdtrack * 10.1;
+            }*/
+
             //-- If input energy < 20 MeV, just add remaining energy
             sum_mrd_Emu += input_Emu;
 
@@ -2118,6 +2138,8 @@ bool MuonFitter::Execute(){
           std::cout << " [debug] reconstructed Emu (Simple E Reco): " << reco_mu_e << std::endl;
         }
 
+        reco_muon_ke = reco_mu_e;   //-- store for CStore
+
         h_mrd_angle->Fill(trackAngleRad*180./TMath::Pi());    //-- Save the angle of reconstructed event
         h_mrd_eloss_diff->Fill(sum_mrd_Emu - mrdEnergyLoss);  //-- Diff btwn const dE/dx and ANNIE method
 
@@ -2149,6 +2171,7 @@ bool MuonFitter::Execute(){
 
           //-- Compare with true muon energy
           double true_mu_e = trueMuonEnergy - 105.66;   //minus rest mass
+          reco_mu_e = reco_mu_e + ERECO_SHIFT;
           double ediff = reco_mu_e - true_mu_e;
           h_true_reco_E->Fill(true_mu_e, reco_mu_e);
           h_true_reco_Ediff->Fill(ediff);
@@ -2263,11 +2286,13 @@ bool MuonFitter::Execute(){
   // ------------------------------------------------------------
   // --- Store variables to CStore for downstream tools ---------
   // ------------------------------------------------------------
-  std::cout << " MuonFitter Tool: Setting FittedTrackLengthInWater to CStore " << fitted_tank_track << std::endl;
-  m_data->CStore.Set("FittedTrackLengthInWater", fitted_tank_track);  //could be -888 if no fit
+  std::cout << " MuonFitter Tool: Setting FittedTrackLengthInWater to CStore: " << fitted_tank_track << std::endl;
+  m_data->CStore.Set("FittedTrackLengthInWater", fitted_tank_track);  //could be -888 or -999 if no fit
   std::cout << " MuonFitter Tool: Setting FittedMuonVertex to CStore" << std::endl;
-  Position fitted_muon_vtx(fitted_vtx.X(), fitted_vtx.Y(), fitted_vtx.Z());   //could be -888 if no fit
+  Position fitted_muon_vtx(fitted_vtx.X(), fitted_vtx.Y(), fitted_vtx.Z());   //could be -888 or -999 if no fit
   m_data->CStore.Set("FittedMuonVertex", fitted_muon_vtx);
+  std::cout << " MuonFitter Tool: Setting RecoMuonKE to CStore: " << reco_muon_ke << std::endl;
+  m_data->CStore.Set("RecoMuonKE", reco_muon_ke);   //could be -888 or -999 if no fit
 
 
   // ------------------------------------------------------------
@@ -2402,6 +2427,7 @@ bool MuonFitter::Execute(){
     ss_eta_title << "#eta: #PE Divided By f (tot PMT charge > " << PMTQCut << ") Ev_";
     ss_eta_ai_name << "c_eta_ai";
     if (isData) ss_eta_ai_name << "_r" << runnumber;
+    else ss_eta_ai_name << "_wcsim";
     ss_eta_ai_name << "_p" << partnumber << "_ev";
     if (isData)
     {
@@ -2475,7 +2501,10 @@ bool MuonFitter::Execute(){
     c_h_tzero->cd();
     std::stringstream ss_t0_title, ss_t0_name;
     ss_t0_title << "t0" << " p" << partnumber << "_ev";
-    ss_t0_name << "c_h_tzero_p" << partnumber << "_ev";
+    ss_t0_name << "c_h_tzero";
+    if (isData) ss_t0_name << "_r" << runnumber;
+    else ss_t0_name << "_wcsim";
+    ss_t0_name << "_p" << partnumber << "_ev";
     if (isData)
     {
       ss_t0_title << evnum;

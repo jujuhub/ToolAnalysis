@@ -81,6 +81,8 @@ class MuonFitter: public Tool {
     double I_S = 1.632e-4;    //=10.6*16*0.000001
     double I_FE = 2.86e-4;    //=11*26*0.000001
 
+    double ERECO_SHIFT = 0.;
+
 
     //logging
     int verbosity;

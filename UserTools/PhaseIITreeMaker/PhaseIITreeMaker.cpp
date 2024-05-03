@@ -31,6 +31,8 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
   m_variables.Get("MRDClusterProcessing",MRDClusterProcessing);
   m_variables.Get("TriggerProcessing",TriggerProcessing);
 
+  m_variables.Get("MuonFitter_fill", MuonFitter_fill);    //juju
+
   std::string output_filename;
   m_variables.Get("OutputFile", output_filename);
   fOutput_tfile = new TFile(output_filename.c_str(), "recreate");
@@ -100,6 +102,15 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITankClusterTree->Branch("SiPMNum",&fSiPMNum);
       fPhaseIITankClusterTree->Branch("SiPM1NPulses",&fSiPM1NPulses,"SiPM1NPulses/I");
       fPhaseIITankClusterTree->Branch("SiPM2NPulses",&fSiPM2NPulses,"SiPM2NPulses/I");
+    }
+    //MuonFitter reco track length, vtx, energy; juju
+    if (MuonFitter_fill)
+    {
+      fPhaseIITankClusterTree->Branch("recoMuonVtxX", &fRecoMuonVtxX, "recoMuonVtxX/D");
+      fPhaseIITankClusterTree->Branch("recoMuonVtxY", &fRecoMuonVtxY, "recoMuonVtxY/D");
+      fPhaseIITankClusterTree->Branch("recoMuonVtxZ", &fRecoMuonVtxZ, "recoMuonVtxZ/D");
+      fPhaseIITankClusterTree->Branch("recoTankTrack", &fRecoTankTrack, "recoTankTrack/D");
+      fPhaseIITankClusterTree->Branch("recoMuonKE", &fRecoMuonKE, "recoMuonKE/D");
     }
   } 
 
@@ -391,6 +402,16 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("deltaZenith",&fDeltaZenith,"deltaZenith/D");
       fPhaseIITrigTree->Branch("deltaAngle",&fDeltaAngle,"deltaAngle/D");
     } 
+
+    //MuonFitter reco track length, vtx, energy; juju
+    if (MuonFitter_fill)
+    {
+      fPhaseIITrigTree->Branch("recoMuonVtxX", &fRecoMuonVtxX, "recoMuonVtxX/D");
+      fPhaseIITrigTree->Branch("recoMuonVtxY", &fRecoMuonVtxY, "recoMuonVtxY/D");
+      fPhaseIITrigTree->Branch("recoMuonVtxZ", &fRecoMuonVtxZ, "recoMuonVtxZ/D");
+      fPhaseIITrigTree->Branch("recoTankTrack", &fRecoTankTrack, "recoTankTrack/D");
+      fPhaseIITrigTree->Branch("recoMuonKE", &fRecoMuonKE, "recoMuonKE/D");
+    }
   }
   return true;
 }
@@ -563,6 +584,16 @@ bool PhaseIITreeMaker::Execute(){
       }
 
       if(SiPMPulseInfo_fill) this->LoadSiPMHits();
+      if (MuonFitter_fill)
+      {
+        Position tmp_vtx(-999,-999,-999);
+        m_data->CStore.Get("FittedMuonVertex", tmp_vtx);
+        fRecoMuonVtxX = tmp_vtx.X();
+        fRecoMuonVtxY = tmp_vtx.Y();
+        fRecoMuonVtxZ = tmp_vtx.Z();
+        m_data->CStore.Get("FittedTrackLengthInWater", fRecoTankTrack);
+        m_data->CStore.Get("RecoMuonKE", fRecoMuonKE);
+      }
       fPhaseIITankClusterTree->Fill();
       cluster_num += 1;
       if (isData){
@@ -794,6 +825,17 @@ bool PhaseIITreeMaker::Execute(){
     // FIll tree with all reconstruction information
     if (RecoDebug_fill) this->FillRecoDebugInfo();
 
+    if (MuonFitter_fill)
+    {
+      Position tmp_vtx(-999,-999,-999);
+      m_data->CStore.Get("FittedMuonVertex", tmp_vtx);
+      fRecoMuonVtxX = tmp_vtx.X();
+      fRecoMuonVtxY = tmp_vtx.Y();
+      fRecoMuonVtxZ = tmp_vtx.Z();
+      m_data->CStore.Get("FittedTrackLengthInWater", fRecoTankTrack);
+      m_data->CStore.Get("RecoMuonKE", fRecoMuonKE);
+    }
+
     fPhaseIITrigTree->Fill();
   }
   return true;
@@ -1022,6 +1064,15 @@ void PhaseIITreeMaker::ResetVariables() {
     fDeltaAzimuth = -9999;
     fDeltaZenith = -9999;
     fDeltaAngle = -9999;
+  }
+
+  if (MuonFitter_fill)
+  {
+    fRecoMuonVtxX = -9999;
+    fRecoMuonVtxY = -9999;
+    fRecoMuonVtxZ = -9999;
+    fRecoTankTrack = -9999;
+    fRecoMuonKE = -9999;
   }
 }
 
