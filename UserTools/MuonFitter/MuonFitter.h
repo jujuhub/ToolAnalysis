@@ -41,7 +41,7 @@
  * \class MuonFitter
  *
  * $ Author: J.He              $
- * $ Last Updated: 2023/09/18  $
+ * $ Last Updated: 2024/05/03  $
  * Contact: juhe@ucdavis.edu
 */
 
@@ -60,6 +60,7 @@ class MuonFitter: public Tool {
     void LoadTankTrackFits();
     double CalcTankdEdx(double input_E);
     double CalcMRDdEdx(double input_E);
+    void ResetVariables();
 
 
   private:
@@ -313,6 +314,20 @@ class MuonFitter: public Tool {
     double right_avg_eta;
     int num_left_eta;
     int num_right_eta;
+
+    // reconstruction variables (for NeutronMultiplicity toolchain)
+    int SimpleRecoFlag;
+    double SimpleRecoEnergy;
+    Position SimpleRecoVtx;
+    Position SimpleRecoStopVtx;
+    double SimpleRecoCosTheta;
+    double SimpleRecoPt;
+    bool SimpleRecoFV;
+    double SimpleRecoMrdEnergyLoss;
+    double SimpleRecoTrackLengthInMRD;
+    Position SimpleRecoMRDStart;
+    Position SimpleRecoMRDStop;
+
 };
 
 

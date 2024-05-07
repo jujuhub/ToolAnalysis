@@ -15,6 +15,9 @@
  * 240407v1JH: reco mode no longer includes finding muon, added 
  *              cluster_time to m_tank_track_fits
  * 240425v1JH: incorporated scattering effects into MRD track length
+ * 240503v1JH: added SimpleReco* variables for NeutronMultiplicity 
+ *              toolchain
+ * 250506v1JH: adjusted nlyrs method (additional 0.5 iron layer)
  * *****************************************************************
  */
 
@@ -747,7 +750,8 @@ bool MuonFitter::Execute(){
   // ------------------------------------------------------------
   // --- Reset variables ----------------------------------------
   // ------------------------------------------------------------
-  //this->ResetVariables();   //TODO:write ResetVariables func
+  // TODO:move below variables to ResetVariables function
+  this->ResetVariables();
   bool drawEvent = false;   //-- Make graphs for this event (e.g. ev displays, eta vs ai)
   if (plot3d) { reset_3d(); }
 
@@ -1030,7 +1034,7 @@ bool MuonFitter::Execute(){
   //-- Use num layers to determine amount of track length in iron
   //-- NOTE: this is an "effective" track length
   //-- (5cm)*(num layers)/cos(theta) << 5cm is thickness of iron slab
-  nlyrs_mrd_track = 5.*LayersHit.size()/abs(TMath::Cos(trackAngleRad));
+  nlyrs_mrd_track = 5.*(LayersHit.size()+0.5)/abs(TMath::Cos(trackAngleRad));
 
   //-- Compare MRD tracks reconstructed w/ ANNIE methods and num layers
   //h_mrd_nlyrs_reco->Fill(reco_mrd_track, nlyrs_mrd_track);
@@ -1841,7 +1845,7 @@ bool MuonFitter::Execute(){
         h_mrd_track_diff_nlyrs->Fill(conn_dots_mrd_track - nlyrs_mrd_track);
         h_total_track_diff->Fill((reco_mrd_track+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
         //h_total_track_diff->Fill((conn_dots_mrd_track+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
-        h_total_track_diff_nlyrs->Fill((5.*LayersHit.size()/abs(TMath::Cos(trackAngleRad))+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
+        h_total_track_diff_nlyrs->Fill((nlyrs_mrd_track+fitted_tank_track) - (trueTrackLengthInMRD+trueTrackLengthInWater));
       }
 
       //-- Load cluster
@@ -2293,6 +2297,84 @@ bool MuonFitter::Execute(){
   m_data->CStore.Set("FittedMuonVertex", fitted_muon_vtx);
   std::cout << " MuonFitter Tool: Setting RecoMuonKE to CStore: " << reco_muon_ke << std::endl;
   m_data->CStore.Set("RecoMuonKE", reco_muon_ke);   //could be -888 or -999 if no fit
+
+
+  // ------------------------------------------------------------
+  // --- SimpleReconstruction variables -------------------------
+  // ------------------------------------------------------------
+  // -- Code based on SimpleReconstruction tool
+  // if able to fit a vertex, set SimpleRecoFlag (int) to 1
+  if (fitted_tank_track > 0) SimpleRecoFlag = 1;
+
+  SimpleRecoEnergy = reco_muon_ke;
+
+  Position reco_vtx(fitted_vtx.X()/100., fitted_vtx.Y()/100., fitted_vtx.Z()/100.); //convert to [m]
+  SimpleRecoVtx = reco_vtx;
+  SimpleRecoStopVtx = mrdStopVertex;  //already in [m]
+
+  SimpleRecoCosTheta = TMath::Cos(trackAngleRad);   //diff from dirz in SimpleReco by factor of 2
+
+  double SimpleRecoTotalEnergy = SimpleRecoEnergy + 105.66;
+  SimpleRecoPt = sqrt((1-SimpleRecoCosTheta*SimpleRecoCosTheta)*(SimpleRecoTotalEnergy*SimpleRecoTotalEnergy-105.66*105.66)); 
+
+  //if (sqrt(fitted_vtx.X()*fitted_vtx.X()+(fitted_vtx.Z()-1.681)*(fitted_vtx.Z()-1.681))<1.0 && fabs(fitted_vtx.Y())<0.5 && ((fitted_vtx.Z()-1.681) < 0.)) SimpleRecoFV = true;
+  if (sqrt(reco_vtx.X()*reco_vtx.X()+(reco_vtx.Z())*(reco_vtx.Z()))<1.0 && fabs(reco_vtx.Y())<0.5 && ((reco_vtx.Z()) < 0.))
+  { //no tank center correction
+    std::cout << " MuonFitter Tool: Made FV cut!" << std::endl;
+    SimpleRecoFV = true;
+  }
+  else std::cout << " MuonFitter Tool: Did not make FV cut! reco_vtx(x,y,z): " << reco_vtx.X() << "," << reco_vtx.Y() << "," << reco_vtx.Z() << std::endl;
+  SimpleRecoMrdEnergyLoss = mrdEnergyLoss;  //placeholder; not used in NM tool
+  SimpleRecoTrackLengthInMRD = reco_mrd_track/100.;  //placeholder; not used in NM tool
+  SimpleRecoMRDStart = mrdStartVertex;
+  SimpleRecoMRDStop = mrdStopVertex;
+
+  //Set variables in RecoEvent Store
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoFlag",SimpleRecoFlag);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoEnergy",SimpleRecoEnergy);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoVtx",SimpleRecoVtx);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoStopVtx",SimpleRecoStopVtx);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoCosTheta",SimpleRecoCosTheta);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoPt",SimpleRecoPt);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoFV",SimpleRecoFV);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoMrdEnergyLoss",SimpleRecoMrdEnergyLoss);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoTrackLengthInMRD",SimpleRecoTrackLengthInMRD);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoMRDStart",SimpleRecoMRDStart);
+  m_data->Stores["RecoEvent"]->Set("SimpleRecoMRDStop",SimpleRecoMRDStop);
+
+  //Fill Particles object with muon
+  if (SimpleRecoFlag){
+
+    //Define muon particle
+    int muon_pdg = 13;
+    tracktype muon_tracktype = tracktype::CONTAINED;
+    double muon_E_start = SimpleRecoEnergy;
+    double muon_E_stop = 0;
+    Position muon_vtx_start = SimpleRecoVtx;
+    Position muon_vtx_stop = SimpleRecoStopVtx;
+    Position muon_dir = SimpleRecoStopVtx - SimpleRecoVtx;
+    Direction muon_start_dir = Direction(muon_dir.X(),muon_dir.Y(),muon_dir.Z());
+    double muon_start_time;
+    m_data->Stores["RecoEvent"]->Get("PromptMuonTime", muon_start_time);
+    double muon_tracklength = muon_dir.Mag();
+    double muon_stop_time = muon_start_time + muon_tracklength/3.E8*1.33;
+
+    Particle muon(muon_pdg,muon_E_start,muon_E_stop,muon_vtx_start,muon_vtx_stop,muon_start_time,muon_stop_time,muon_start_dir,muon_tracklength,muon_tracktype);
+    if (verbosity > 2){
+      Log(" MuonFitter Tool: Added muon with the following properties as a particle:",v_message,verbosity);
+      muon.Print();
+    }
+
+    //Add muon particle to Particles collection
+    std::vector<Particle> Particles;
+    get_ok = m_data->Stores["ANNIEEvent"]->Get("Particles",Particles);
+    if (!get_ok){
+      Particles = {muon};
+    } else {
+      Particles.push_back(muon);
+    }
+    m_data->Stores["ANNIEEvent"]->Set("Particles",Particles);
+  }
 
 
   // ------------------------------------------------------------
@@ -2783,4 +2865,29 @@ double MuonFitter::CalcMRDdEdx(double input_E)
   double fe_dEdx = 7.121*0.307*0.464*pow(1./beta,2)*(0.5*fe_ln-beta*beta-0.5);
 
   return fe_dEdx;
+}
+
+void MuonFitter::ResetVariables()
+{
+  // Set default values for reconstruction variables
+  SimpleRecoFlag = -9999;
+  SimpleRecoEnergy = -9999;
+  SimpleRecoVtx.SetX(-9999);
+  SimpleRecoVtx.SetY(-9999);
+  SimpleRecoVtx.SetZ(-9999);
+  SimpleRecoCosTheta = -9999;
+  SimpleRecoPt = -9999;
+  SimpleRecoStopVtx.SetX(-9999);
+  SimpleRecoStopVtx.SetY(-9999);
+  SimpleRecoStopVtx.SetZ(-9999);
+  SimpleRecoFV = false;
+  SimpleRecoMrdEnergyLoss = -9999;
+  SimpleRecoTrackLengthInMRD = -9999;
+  SimpleRecoMRDStart.SetX(-9999);
+  SimpleRecoMRDStart.SetY(-9999);
+  SimpleRecoMRDStart.SetZ(-9999);
+  SimpleRecoMRDStop.SetX(-9999);
+  SimpleRecoMRDStop.SetY(-9999);
+  SimpleRecoMRDStop.SetZ(-9999);
+
 }
