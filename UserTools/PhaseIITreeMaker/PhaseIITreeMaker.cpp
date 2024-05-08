@@ -411,6 +411,7 @@ bool PhaseIITreeMaker::Initialise(std::string configfile, DataModel &data){
       fPhaseIITrigTree->Branch("recoMuonVtxZ", &fRecoMuonVtxZ, "recoMuonVtxZ/D");
       fPhaseIITrigTree->Branch("recoTankTrack", &fRecoTankTrack, "recoTankTrack/D");
       fPhaseIITrigTree->Branch("recoMuonKE", &fRecoMuonKE, "recoMuonKE/D");
+      fPhaseIITrigTree->Branch("numMrdLayers", &fNumMrdLayers, "numMrdLayers/I");
     }
   }
   return true;
@@ -834,6 +835,7 @@ bool PhaseIITreeMaker::Execute(){
       fRecoMuonVtxZ = tmp_vtx.Z();
       m_data->CStore.Get("FittedTrackLengthInWater", fRecoTankTrack);
       m_data->CStore.Get("RecoMuonKE", fRecoMuonKE);
+      m_data->CStore.Get("NLyers", fNumMrdLayers);
     }
 
     fPhaseIITrigTree->Fill();
@@ -1073,6 +1075,7 @@ void PhaseIITreeMaker::ResetVariables() {
     fRecoMuonVtxZ = -9999;
     fRecoTankTrack = -9999;
     fRecoMuonKE = -9999;
+    fNumMrdLayers = -9999;
   }
 }
 

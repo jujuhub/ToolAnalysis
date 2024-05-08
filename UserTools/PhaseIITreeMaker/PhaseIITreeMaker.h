@@ -338,6 +338,7 @@ class PhaseIITreeMaker: public Tool {
   double fRecoMuonVtxZ;
   double fRecoTankTrack;
   double fRecoMuonKE;
+  int fNumMrdLayers;
 
   /// \brief Integer that determines the level of logging to perform
   int verbosity = 0;

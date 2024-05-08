@@ -17,7 +17,8 @@
  * 240425v1JH: incorporated scattering effects into MRD track length
  * 240503v1JH: added SimpleReco* variables for NeutronMultiplicity 
  *              toolchain
- * 250506v1JH: adjusted nlyrs method (additional 0.5 iron layer)
+ * 240506v1JH: adjusted nlyrs method (additional 0.5 iron layer)
+ * 240509v1JH: I am once again, updating the dEdx
  * *****************************************************************
  */
 
@@ -778,6 +779,7 @@ bool MuonFitter::Execute(){
   Position dummy_vtx(-888, -888, -888);
   m_data->CStore.Set("FittedMuonVertex", dummy_vtx);
   m_data->CStore.Set("RecoMuonKE", -888.);
+  m_data->CStore.Set("NLyrs", -999);
 
 
   // -------------------------------------------------------------
@@ -818,6 +820,13 @@ bool MuonFitter::Execute(){
     std::string tmp_str = mcFile.erase(0, mcFile.find(delim) + delim.length());
     partnumber = stoi(tmp_str.substr(0, tmp_str.find(delim)));
 
+    /*for(unsigned int particlei=0; particlei<mcParticles->size(); particlei++){
+
+      MCParticle aparticle = mcParticles->at(particlei);
+      std::string logmessage = "EventDisplay tool: Particle # "+std::to_string(particlei)+", parent ID = "+std::to_string(aparticle.GetParentPdg())+", pdg = "+std::to_string(aparticle.GetPdgCode())+", flag = "+std::to_string(aparticle.GetFlag());
+      Log(logmessage,v_message,verbosity);
+    }*/
+
     //-- Get RecoEvent variables
     get_ok = m_data->Stores["RecoEvent"]->Get("TrueVertex", truevtx);
     if (not get_ok) { Log("MuonFitter Tool: Error retrieving TrueVertex from RecoEvent Store!", v_error, verbosity); return false; }
@@ -831,6 +840,7 @@ bool MuonFitter::Execute(){
     trueTrackDir = TVector3(trueDirX,trueDirY,trueDirZ).Unit();
 
     trueAngleRad = TMath::ACos(trueDirZ);  //calculated like this in other tools
+    std::cout << " [debug] trueDirZ: " << trueDirZ << std::endl;
     trueAngleDeg = trueAngleRad/(TMath::Pi()/180.);
     h_truevtx_angle->Fill(trueAngleDeg);
 
@@ -1129,7 +1139,7 @@ bool MuonFitter::Execute(){
   h_pca_reco_angle->Fill(pcaAngleDeg-trackAngleDeg);
 
   //-- Update nlyrs_mrd_track so that it uses the PCA-reconstructed track angle
-  double pca_mrd_track = 5.*LayersHit.size()/abs(TMath::Cos(pcaAngleRad));
+  double pca_mrd_track = 5.*(LayersHit.size()+0.5)/abs(TMath::Cos(pcaAngleRad));
   std::cout << " [debug] PCA nlyrs_mrd_track: " << pca_mrd_track << std::endl;
   if (use_pca) { nlyrs_mrd_track = pca_mrd_track; }
 
@@ -1802,6 +1812,8 @@ bool MuonFitter::Execute(){
   double fitted_tank_track = -999.;
   TVector3 fitted_vtx(-999,-999,-999);
   double reco_muon_ke = -999.;
+  int num_mrd_lyrs = -999.;
+  num_mrd_lyrs = LayersHit.size();
   if (reco_mode)
   {
     double t0 = -999.;
@@ -1944,7 +1956,7 @@ bool MuonFitter::Execute(){
       if (use_nlyrs) mrd_track = nlyrs_mrd_track;
       if (use_conn_dots) mrd_track = conn_dots_mrd_track;
 
-      double mrd_dEdx = 11.3;     //MeV/cm
+      double mrd_dEdx = 14.;     //MeV/cm; 10.1, 11.3
       double mrd_edep = mrd_track * mrd_dEdx;
       if (use_eloss) mrd_edep = mrdEnergyLoss;  //use official ANNIE tool reco MRD energy loss as the starting point
       std::cout << " [debug] mrd_edep: " << mrd_edep << std::endl;  //check which MRD energy is used
@@ -2297,6 +2309,7 @@ bool MuonFitter::Execute(){
   m_data->CStore.Set("FittedMuonVertex", fitted_muon_vtx);
   std::cout << " MuonFitter Tool: Setting RecoMuonKE to CStore: " << reco_muon_ke << std::endl;
   m_data->CStore.Set("RecoMuonKE", reco_muon_ke);   //could be -888 or -999 if no fit
+  m_data->CStore.Set("NLyers", num_mrd_lyrs);
 
 
   // ------------------------------------------------------------
