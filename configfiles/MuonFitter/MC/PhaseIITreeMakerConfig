@@ -1,6 +1,6 @@
 verbose 5
 
-OutputFile MC_BeamRun_999.ntuple.root
+OutputFile MC_BeamRun_Reco_2998.ntuple.root
 TankClusterProcessing 1
 MRDClusterProcessing 1
 TriggerProcessing 1

@@ -10,3 +10,5 @@ myEventSelector EventSelector ./configfiles/MuonFitter/MC/EventSelectorConfig
 myMuonFitter MuonFitter ./configfiles/MuonFitter/MC/MuonFitterConfig
 #myEventDisplay EventDisplay ./configfiles/MuonFitter/MC/EventDisplayConfig
 myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/MC/PhaseIITreeMakerConfig
+myFindNeutrons FindNeutrons ./configfiles/MuonFitter/MC/FindNeutronsConfig
+myNeutronMultiplicity NeutronMultiplicity ./configfiles/MuonFitter/MC/NeutronMultiplicityConfig

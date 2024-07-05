@@ -61,6 +61,15 @@ class MuonFitter: public Tool {
     double CalcTankdEdx(double input_E);
     double CalcMRDdEdx(double input_E);
     void ResetVariables();
+    void InitHistograms();
+    void SaveHistograms();
+    void InitCanvases();
+    void SaveCanvases();
+    void InitGraphs();
+    double PCATrackAngle(std::vector<int> v_MrdPMTHits);
+    double MRDConnectDots(std::vector<int> v_MrdPMTHits);
+    double CalcNeutrinoEnergy(double Emu, double cosT);
+    double CalcQ2(double Emu, double cosT, double Ev);
 
 
   private:
@@ -76,11 +85,14 @@ class MuonFitter: public Tool {
     double CHER_ANGLE_DEG = 41.;    //[deg] 41 or 42?
     double CHER_ANGLE_RAD = CHER_ANGLE_DEG*TMath::Pi()/180.;   //[rads]
     double ALPHA_FACTOR = PHOTON_DENSITY / (4.*TMath::Pi()*TMath::Sin(CHER_ANGLE_RAD)*TMath::Tan(CHER_ANGLE_RAD));
+
     double I_O = 9.200e-5;   //=11.5*8*0.000001
     double I_H = 1.920e-5;   //=19.2*1*0.000001
     double I_GD = 5.888e-4;   //=19.2*1*0.000001
     double I_S = 1.632e-4;    //=10.6*16*0.000001
     double I_FE = 2.86e-4;    //=11*26*0.000001
+    double WATER_DENSITY = 1.0;   //g/cm3
+    double IRON_DENSITY = 7.874;  //g/cm3
 
     double ERECO_SHIFT = 0.;
 
@@ -117,117 +129,53 @@ class MuonFitter: public Tool {
 
     //text files
     std::ofstream pos_file;
-    std::ofstream cpp_file;
-    std::ofstream pehits_file;
     std::ofstream truetrack_file;
-    std::ofstream nhits_trlen_file;
     std::ofstream lg_ediff_file;
 
     //root,plots
     TFile *root_outp = nullptr;
+
     TCanvas *canvas_3d;
-    TCanvas *canvas_vtxq;
-    TCanvas *c_effarea_detkey;
-    TCanvas *c_fpmt_detkey;
-    TCanvas *c_effarea_ai;
-    TCanvas *c_fpmt_ai;
     TCanvas *c_eta_ai;
-
-    TCanvas *canvas_ev_display; //test saving of ev displays
-    std::map<uint32_t, TCanvas *> m_evdisplays;
-
     TCanvas *c_h_tzero;
-    TH1D *h_tzero = nullptr;
 
-    TGraph *gr_qdensity_in = nullptr;
-    TGraph *gr_qdensity_out = nullptr;
-    TGraph *gr_vtx_detkey_in = nullptr;
-    TGraph *gr_vtx_detkey_out = nullptr;
-    TGraph *gr_effarea_detkey = nullptr;
-    TGraph *gr_effarea_ai = nullptr;
-    TGraph *gr_fpmt_detkey = nullptr;
-    TGraph *gr_fpmt_ai = nullptr;
     TGraph *gr_eta_ai = nullptr;
-    TGraph *gr_qincone_ai = nullptr;
-    TGraph *gr_qoutcone_ai = nullptr;
     TGraph *gr_running_avg = nullptr;
-    TH1D *h_expected_PE = nullptr;
-    TH1D *h_phot_inc_angle = nullptr;
-    TH1D *h_hit_angles = nullptr;
-    TH1D *h_fitted_tank_track_len = nullptr;
-    TH1D *h_closest_approach = nullptr;
+
+    TH1D *h_tzero = nullptr;
     TH1D *h_num_mrd_layers = nullptr;
-    TH1D *h_clusterhit_x = nullptr;
-    TH1D *h_clusterhit_y = nullptr;
-    TH1D *h_clusterhit_z = nullptr;
-    TH1D *h_clusterhit_detkey = nullptr;
     TH1D *h_truevtx_angle = nullptr;
     TH1D *h_tankexit_to_pmt = nullptr;
     TH1D *h_tanktrack_ai = nullptr;
     TH1D *h_eff_area_pmt = nullptr;
     TH1D *h_fpmt = nullptr;
-    TH2D *h_eta_ai = nullptr;
     TH1D *h_clusterhit_timespread = nullptr;
-    TH1D *h_clusterhit_time = nullptr;
-    TH1D *h_qincone_truevtx = nullptr;
-    TH1D *h_qoutcone_truevtx = nullptr;
-    TH2D *h_total_pe_hits = nullptr;
-    TH1D *h_truevtx_trueexit_track = nullptr;
-    TH1D *h_pmt_charge = nullptr;
-    TH1D *h_lr_avg_eta = nullptr;
     TH1D *h_avg_eta = nullptr;
-    TH1D *h_truefitdiff_x = nullptr;
-    TH1D *h_truefitdiff_y = nullptr;
-    TH1D *h_truefitdiff_z = nullptr;
     TH1D *h_tdiff = nullptr;
     TH1D *h_uber_t0widths = nullptr;
     TH1D *h_true_tanktrack_len = nullptr;
     TH1D *h_fitted_tank_track = nullptr;
-    TH1D *h_truefit_len_diff = nullptr;
-    TH1D *h_vtxfit_x = nullptr;
-    TH1D *h_vtxfit_y = nullptr;
-    TH1D *h_vtxfit_z = nullptr;
-    TH1D *h_truevtx_x = nullptr;
-    TH1D *h_truevtx_y = nullptr;
-    TH1D *h_truevtx_z = nullptr;
-    TH2D *h_topview_fit = nullptr;
-    TH2D *h_topview_truth = nullptr;
-    TH2D *h_sideview_fit = nullptr;
-    TH2D *h_sideview_truth = nullptr;
     TH1D *h_deltaR = nullptr;
     TH1D *h_transverse = nullptr;
     TH1D *h_parallel = nullptr;
-    TH1D *h_deltaR_4pi = nullptr;
     TH2D *h_true_reco_E = nullptr;
     TH1D *h_true_reco_Ediff = nullptr;
     TH2D *h_tank_mrd_E = nullptr;
-    TH2D *h_Ediff_frac_tank = nullptr;
-    TH2D *h_Ediff_frac_mrd = nullptr;
     TH1D *h_mrd_eloss_diff = nullptr;
     TH1D *h_tank_track_diff_small = nullptr;
     TH1D *h_tank_track_diff_large = nullptr;
-    TH1D *h_mrd_track_diff_small = nullptr;
-    TH1D *h_mrd_track_diff_large = nullptr;
-    TH1D *h_deltaR_small = nullptr;
-    TH1D *h_deltaR_large = nullptr;
-    TH2D *h_mrd_nlyrs_reco = nullptr;
-    TH1D *h_mrd_track_diff = nullptr;
-    TH1D *h_mrd_track_diff_nlyrs = nullptr;
-    TH1D *h_mrd_angle_diff = nullptr;
-    TH1D *h_mrd_angle = nullptr;
     TH1D *h_clusterPE = nullptr;
     TH1D *h_clusterPE_fit = nullptr;
     TH1D *h_clusterPE_fit_haspion = nullptr;
     TH1D *h_clusterPE_lrg_ediff = nullptr;
     TH1D *h_clusterPE_lrg_ediff_haspion = nullptr;
     TH1D *h_pca_angle = nullptr;
-    TH1D *h_pca_reco_angle = nullptr;
-    TH1D *h_pca_true_angle = nullptr;
-    TH1D *h_total_track_diff = nullptr;
-    TH1D *h_total_track_diff_nlyrs = nullptr;
     TH1D *h_remainder_track_last20MeV = nullptr;
     TH1D *h_true_reco_Ediff_last20MeV = nullptr;
     TH2D *h_remainder_track_Ediff_last20MeV = nullptr;
+    TH1D *h_tankExitX = nullptr;
+    TH1D *h_tankExitY = nullptr;
+    TH1D *h_tankExitZ = nullptr;
 
     //event variables
     int partnumber;
@@ -327,6 +275,10 @@ class MuonFitter: public Tool {
     double SimpleRecoTrackLengthInMRD;
     Position SimpleRecoMRDStart;
     Position SimpleRecoMRDStop;
+    int DownstreamFV;
+    int FullCylFV;
+    double SimpleRecoNeutrinoEnergy;
+    double SimpleRecoQ2;
 
 };
 

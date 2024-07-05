@@ -7,6 +7,6 @@ myClusterClassifiers ClusterClassifiers ./configfiles/MuonFitter/Data/ClusterCla
 myEventSelector EventSelector ./configfiles/MuonFitter/Data/EventSelectorConfig
 #myEventDisplay EventDisplay ./configfiles/MuonFitter/Data/EventDisplayConfig
 myMuonFitter MuonFitter ./configfiles/MuonFitter/Data/MuonFitterConfig
-#myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/Data/PhaseIITreeMakerConfig
+myPhaseIITreeMaker PhaseIITreeMaker ./configfiles/MuonFitter/Data/PhaseIITreeMakerConfig
 myFindNeutrons FindNeutrons ./configfiles/MuonFitter/Data/FindNeutronsConfig
 myNeutronMultiplicity NeutronMultiplicity ./configfiles/MuonFitter/Data/NeutronMultiplicityConfig

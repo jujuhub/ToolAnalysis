@@ -1,0 +1,7 @@
+verbosity 1
+
+SaveROOT 1
+SaveBoostStore 1
+ReadFromBoostStore None
+Filename NM_MF_CBStrict_wcsim_2998
+MRDTrackRestriction 1
